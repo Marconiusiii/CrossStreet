@@ -2335,7 +2335,8 @@ struct WatchIntersectionBuilder {
 					nodeID: element.id,
 					at: coordinate,
 					on: road,
-					between: streetIntersections
+					between: streetIntersections,
+					roads: roads
 				) else {
 					return nil
 				}
@@ -2385,7 +2386,8 @@ struct WatchIntersectionBuilder {
 				nodeID: element.id,
 				at: coordinate,
 				on: road,
-				between: streetIntersections
+				between: streetIntersections,
+				roads: coreData.roads
 			) else {
 				return nil
 			}
@@ -2451,11 +2453,23 @@ struct WatchIntersectionBuilder {
 		nodeID: Int64,
 		at coordinate: CLLocationCoordinate2D,
 		on road: WatchMapRoad,
-		between intersections: [WatchIntersectionCandidate]
+		between intersections: [WatchIntersectionCandidate],
+		roads: [WatchMapRoad]
 	) -> Bool {
 		let minimumJunctionSeparation: CLLocationDistance = 35
 		guard !intersections.contains(where: {
 			WatchGeo.distanceMeters(from: coordinate, to: $0.coordinate) < minimumJunctionSeparation
+		}) else {
+			return false
+		}
+		// Corners in real data are often fragmented: an avenue split into several
+		// segments, or a street whose name changes across the junction, so a clean
+		// shared junction node is not always detected. Treat the crossing as a
+		// corner (not mid-block) if any other named street's roadway passes within
+		// the junction-separation distance of it.
+		guard !roads.contains(where: {
+			$0.name != road.name &&
+			$0.minimumDistance(to: coordinate) < minimumJunctionSeparation
 		}) else {
 			return false
 		}

@@ -2528,6 +2528,37 @@ struct IntersectorTests {
 		])
 	}
 
+	@Test func intersectionBuilderSuppressesCornerCrossingsAtFragmentedJunction() async throws {
+		// Real NYC corners are often fragmented: the avenue is split into separate
+		// named segments and the cross street ends without sharing a junction node,
+		// so no clean two-name junction is detected. The crossing still sits at the
+		// corner and must be suppressed by proximity to the avenue's roadway.
+		let response = OverpassResponse(
+			elements: [
+				// Crossing on 20th Street, ~12m west of the avenue line.
+				OverpassElement(type: "node", id: 1, lat: 40.7396764, lon: -73.9911037, nodes: nil, tags: ["highway": "crossing"]),
+				// 20th Street: west end and a near-corner node that is NOT shared with the avenue.
+				OverpassElement(type: "node", id: 2, lat: 40.7396764, lon: -73.9916728, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 3, lat: 40.7396764, lon: -73.9910562, nodes: nil, tags: nil),
+				// 5th Avenue split into two separate segments that share no node with 20th Street.
+				OverpassElement(type: "node", id: 4, lat: 40.7402154, lon: -73.9909614, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 40.7397213, lon: -73.9909614, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 6, lat: 40.7396315, lon: -73.9909614, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 7, lat: 40.7391374, lon: -73.9909614, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [2, 3, 1], tags: ["highway": "residential", "name": "West 20th Street"]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 5], tags: ["highway": "secondary", "name": "5th Avenue"]),
+				OverpassElement(type: "way", id: 12, lat: nil, lon: nil, nodes: [6, 7], tags: ["highway": "secondary", "name": "5th Avenue"])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true)
+		)
+
+		#expect(data.intersections.allSatisfy { !$0.id.hasPrefix("crossing-") })
+	}
+
 	@Test func areaModeOffSkipsNeighborhoodLookup() async throws {
 		let neighborhoodProvider = FakeNeighborhoodProvider(candidates: [
 			NeighborhoodCandidate(
