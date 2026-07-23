@@ -1712,6 +1712,62 @@ extension WatchMapRoad {
 		return headingX * reference.tangentX + headingY * reference.tangentY
 	}
 
+	/// Combine same-named road segments into a single road carrying all their
+	/// coordinates, for geometry tests that must see a fragmented street as a whole.
+	static func merged(_ segments: [WatchMapRoad]) -> WatchMapRoad {
+		guard let first = segments.first else {
+			return WatchMapRoad(id: "", name: "", nodeIDs: [], coordinates: [])
+		}
+		return WatchMapRoad(
+			id: first.id,
+			name: first.name,
+			nodeIDs: segments.flatMap { $0.nodeIDs },
+			coordinates: segments.flatMap { $0.coordinates }
+		)
+	}
+
+	/// Whether this road genuinely traverses `other` near `coordinate` — passing
+	/// across `other`'s line — rather than running parallel a short distance away.
+	/// A crossing street has points on BOTH sides of `other`'s line (its
+	/// perpendicular offset from `other` flips sign) close to the crossing. A
+	/// parallel street stays entirely on one side of `other` and returns false.
+	func traverses(
+		_ other: WatchMapRoad,
+		near coordinate: CLLocationCoordinate2D,
+		within radius: CLLocationDistance
+	) -> Bool {
+		guard let tangent = other.tangent(at: coordinate) else {
+			return false
+		}
+		let normalX = -tangent.y
+		let normalY = tangent.x
+		var sawPositive = false
+		var sawNegative = false
+		for point in coordinates {
+			let vector = Self.localVector(from: coordinate, to: point)
+			guard hypot(vector.x, vector.y) <= radius else {
+				continue
+			}
+			let offset = vector.x * normalX + vector.y * normalY
+			if offset > 1 {
+				sawPositive = true
+			} else if offset < -1 {
+				sawNegative = true
+			}
+			if sawPositive && sawNegative {
+				return true
+			}
+		}
+		return false
+	}
+
+	private func tangent(at coordinate: CLLocationCoordinate2D) -> (x: Double, y: Double)? {
+		guard let reference = nearestSegmentReference(to: coordinate) else {
+			return nil
+		}
+		return (reference.tangentX, reference.tangentY)
+	}
+
 	func vectorAway(from coordinate: CLLocationCoordinate2D) -> (x: Double, y: Double)? {
 		coordinates
 			.map { Self.localVector(from: coordinate, to: $0) }
@@ -2465,11 +2521,16 @@ struct WatchIntersectionBuilder {
 		// Corners in real data are often fragmented: an avenue split into several
 		// segments, or a street whose name changes across the junction, so a clean
 		// shared junction node is not always detected. Treat the crossing as a
-		// corner (not mid-block) if any other named street's roadway passes within
-		// the junction-separation distance of it.
-		guard !roads.contains(where: {
-			$0.name != road.name &&
-			$0.minimumDistance(to: coordinate) < minimumJunctionSeparation
+		// corner (not mid-block) when a differently-named street genuinely crosses
+		// here — it passes close to the crossing AND traverses past the crossing's
+		// own street rather than merely running parallel nearby. A parallel street a
+		// short distance away (a real mid-block crossing on a short block) is kept.
+		// Group the other streets by name first: a fragmented avenue is several
+		// segments sharing one name, and only their union traverses the crossing.
+		let otherStreets = Dictionary(grouping: roads.filter { $0.name != road.name }) { $0.name }
+		guard !otherStreets.values.contains(where: { segments in
+			segments.contains(where: { $0.minimumDistance(to: coordinate) < minimumJunctionSeparation }) &&
+			WatchMapRoad.merged(segments).traverses(road, near: coordinate, within: minimumJunctionSeparation)
 		}) else {
 			return false
 		}

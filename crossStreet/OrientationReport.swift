@@ -1121,6 +1121,64 @@ extension MapRoad {
 		)
 	}
 
+	/// Combine same-named road segments into a single road carrying all their
+	/// coordinates, for geometry tests that must see a fragmented street as a whole.
+	static func merged(_ segments: [MapRoad]) -> MapRoad {
+		guard let first = segments.first else {
+			return MapRoad(id: "", name: "", nodeIDs: [], coordinates: [])
+		}
+		return MapRoad(
+			id: first.id,
+			name: first.name,
+			nodeIDs: segments.flatMap { $0.nodeIDs },
+			coordinates: segments.flatMap { $0.coordinates }
+		)
+	}
+
+	/// Whether this road genuinely traverses `other` near `coordinate` — passing
+	/// across `other`'s line — rather than running parallel a short distance away.
+	/// A crossing street has points on BOTH sides of `other`'s line (its
+	/// perpendicular offset from `other` flips sign) close to the crossing. A
+	/// parallel street stays entirely on one side of `other` and returns false.
+	func traverses(
+		_ other: MapRoad,
+		near coordinate: CLLocationCoordinate2D,
+		within radius: CLLocationDistance
+	) -> Bool {
+		guard let tangent = other.tangent(at: coordinate) else {
+			return false
+		}
+		// Perpendicular direction to `other`'s line at the crossing.
+		let normalX = -tangent.y
+		let normalY = tangent.x
+		var sawPositive = false
+		var sawNegative = false
+		for point in coordinates {
+			let vector = Self.localVector(from: coordinate, to: point)
+			guard hypot(vector.x, vector.y) <= radius else {
+				continue
+			}
+			// Signed perpendicular offset of this point from `other`'s line.
+			let offset = vector.x * normalX + vector.y * normalY
+			if offset > 1 {
+				sawPositive = true
+			} else if offset < -1 {
+				sawNegative = true
+			}
+			if sawPositive && sawNegative {
+				return true
+			}
+		}
+		return false
+	}
+
+	private func tangent(at coordinate: CLLocationCoordinate2D) -> (x: Double, y: Double)? {
+		guard let reference = nearestSegmentReference(to: coordinate) else {
+			return nil
+		}
+		return (reference.tangentX, reference.tangentY)
+	}
+
 	func vectorAway(from coordinate: CLLocationCoordinate2D) -> (x: Double, y: Double)? {
 		coordinates
 			.map { Self.localVector(from: coordinate, to: $0) }

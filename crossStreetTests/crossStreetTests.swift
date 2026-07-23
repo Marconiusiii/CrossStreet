@@ -2559,6 +2559,35 @@ struct IntersectorTests {
 		#expect(data.intersections.allSatisfy { !$0.id.hasPrefix("crossing-") })
 	}
 
+	@Test func intersectionBuilderKeepsMidBlockCrossingNearParallelAvenue() async throws {
+		// Real short-block case (modeled on West 88th St near Amsterdam Ave): a
+		// genuine mid-block crossing sits on its street with the nearest cross
+		// avenue running PARALLEL only ~34m away — it does not cross the street at
+		// the crossing point. This must be kept, not suppressed as a corner.
+		let response = OverpassResponse(
+			elements: [
+				// Crossing mid-block on West 88th Street.
+				OverpassElement(type: "node", id: 1, lat: 40.7889020, lon: -73.9736562, nodes: nil, tags: ["highway": "crossing"]),
+				// West 88th Street runs east-west through the crossing.
+				OverpassElement(type: "node", id: 2, lat: 40.7889100, lon: -73.9742000, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 3, lat: 40.7888950, lon: -73.9731000, nodes: nil, tags: nil),
+				// Amsterdam Avenue runs north-south, PARALLEL, ~34m east — it never
+				// crosses West 88th Street near the crossing point.
+				OverpassElement(type: "node", id: 4, lat: 40.7894000, lon: -73.9732600, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 40.7884000, lon: -73.9732600, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [2, 1, 3], tags: ["highway": "residential", "name": "West 88th Street"]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 5], tags: ["highway": "secondary", "name": "Amsterdam Avenue"])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true)
+		)
+
+		#expect(data.intersections.contains { $0.id.hasPrefix("crossing-") })
+	}
+
 	@Test func areaModeOffSkipsNeighborhoodLookup() async throws {
 		let neighborhoodProvider = FakeNeighborhoodProvider(candidates: [
 			NeighborhoodCandidate(

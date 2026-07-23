@@ -868,11 +868,16 @@ struct IntersectionBuilder {
 		// Corners in real data are often fragmented: an avenue split into several
 		// segments, or a street whose name changes across the junction, so a clean
 		// shared junction node is not always detected. Treat the crossing as a
-		// corner (not mid-block) if any other named street's roadway passes within
-		// the junction-separation distance of it.
-		guard !roads.contains(where: {
-			$0.name != road.name &&
-			$0.minimumDistance(to: coordinate) < minimumJunctionSeparation
+		// corner (not mid-block) when a differently-named street genuinely crosses
+		// here — it passes close to the crossing AND traverses past the crossing's
+		// own street rather than merely running parallel nearby. A parallel street a
+		// short distance away (a real mid-block crossing on a short block) is kept.
+		// Group the other streets by name first: a fragmented avenue is several
+		// segments sharing one name, and only their union traverses the crossing.
+		let otherStreets = Dictionary(grouping: roads.filter { $0.name != road.name }) { $0.name }
+		guard !otherStreets.values.contains(where: { segments in
+			segments.contains(where: { $0.minimumDistance(to: coordinate) < minimumJunctionSeparation }) &&
+			MapRoad.merged(segments).traverses(road, near: coordinate, within: minimumJunctionSeparation)
 		}) else {
 			return false
 		}
