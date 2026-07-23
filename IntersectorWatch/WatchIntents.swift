@@ -7,13 +7,29 @@
 
 import AppIntents
 import Foundation
+import SwiftUI
+
+/// A plain, normally-sized card showing the reported text once. Returning a
+/// `ReturnsValue<String>` made Siri render an empty result card (the blank
+/// bubble); pairing the spoken dialog with a snippet view instead shows the
+/// text visually without duplicating it.
+private struct WatchIntersectorResultSnippet: View {
+	let text: String
+
+	var body: some View {
+		Text(text)
+			.font(.body)
+			.multilineTextAlignment(.leading)
+			.frame(maxWidth: .infinity, alignment: .leading)
+	}
+}
 
 private func watchIntersectorResult(
 	_ text: String
-) -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+) -> some IntentResult & ProvidesDialog & ShowsSnippetView {
 	.result(
-		value: text,
-		dialog: IntentDialog(stringLiteral: text)
+		dialog: IntentDialog(stringLiteral: text),
+		view: WatchIntersectorResultSnippet(text: text)
 	)
 }
 
@@ -23,7 +39,7 @@ struct WatchNearestIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
 		let text = await IntersectorWatchReporter.reportText(for: .nearest)
 		return watchIntersectorResult(text)
 	}
@@ -35,7 +51,7 @@ struct WatchUpcomingIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
 		let text = await IntersectorWatchReporter.reportText(for: .upcoming)
 		return watchIntersectorResult(text)
 	}
@@ -47,7 +63,7 @@ struct WatchMyDirectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
 		let text = await IntersectorWatchReporter.directionText()
 		return watchIntersectorResult(text)
 	}

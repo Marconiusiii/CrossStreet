@@ -12,8 +12,19 @@ private let watchLookupLoadingText = "Intersecting..."
 
 @MainActor
 private enum WatchVoiceOverAnnouncer {
+	/// Speak the freshly-updated result through VoiceOver. A plain announcement
+	/// posted the instant a button is activated collides with VoiceOver still
+	/// speaking that button, so the system drops it — which is why users had to
+	/// manually focus the Current Info row to hear the output. Marking the
+	/// announcement high priority tells VoiceOver to queue it rather than discard
+	/// it, and a short delay lets the activation speech settle first so it lands.
 	static func reportUpdated(_ text: String) {
-		AccessibilityNotification.Announcement(text).post()
+		Task { @MainActor in
+			try? await Task.sleep(for: .milliseconds(350))
+			var announcement = AttributedString(text)
+			announcement.accessibilitySpeechAnnouncementPriority = .high
+			AccessibilityNotification.Announcement(announcement).post()
+		}
 	}
 }
 
