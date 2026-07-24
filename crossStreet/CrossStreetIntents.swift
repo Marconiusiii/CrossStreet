@@ -8,30 +8,18 @@
 import AppIntents
 import CoreLocation
 import Foundation
-import SwiftUI
 
-/// A plain, normally-sized card showing the reported text once. Returning a
-/// `ReturnsValue<String>` made Siri render an empty result card (the blank
-/// bubble); pairing the spoken dialog with a snippet view instead shows the
-/// text visually without duplicating it.
-private struct IntersectorResultSnippet: View {
-	let text: String
-
-	var body: some View {
-		Text(text)
-			.font(.body)
-			.multilineTextAlignment(.leading)
-			.frame(maxWidth: .infinity, alignment: .leading)
-	}
-}
-
+/// Returns the spoken announcement as a plain dialog only. Siri speaks it and
+/// shows its own native dialog bubble — one correctly-formatted copy of the
+/// text. Earlier attempts paired the dialog with a custom snippet view, which
+/// rendered the text a second time (larger, left-justified, no margins) and
+/// forced a snippet card that appeared as an empty bubble while `perform()` was
+/// still fetching. Returning `ProvidesDialog` alone matches the native system
+/// behavior and avoids both problems.
 private func intersectorResult(
 	_ text: String
-) -> some IntentResult & ProvidesDialog & ShowsSnippetView {
-	.result(
-		dialog: IntentDialog(stringLiteral: text),
-		view: IntersectorResultSnippet(text: text)
-	)
+) -> some IntentResult & ProvidesDialog {
+	.result(dialog: IntentDialog(stringLiteral: text))
 }
 
 struct NearestIntersectionIntent: AppIntent {
@@ -40,7 +28,7 @@ struct NearestIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let text = try await OrientSvc.shared.spokenText(.nearest, prefs: prefs)
@@ -57,7 +45,7 @@ struct UpcomingIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let text = try await OrientSvc.shared.spokenText(.upcoming, prefs: prefs)
@@ -74,7 +62,7 @@ struct SecondNearestIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let report = try await OrientSvc.shared.report(.nearest, rank: 2, prefs: prefs)
@@ -92,7 +80,7 @@ struct ThirdNearestIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let report = try await OrientSvc.shared.report(.nearest, rank: 3, prefs: prefs)
@@ -110,7 +98,7 @@ struct SecondUpcomingIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let report = try await OrientSvc.shared.report(.upcoming, rank: 2, prefs: prefs)
@@ -128,7 +116,7 @@ struct ThirdUpcomingIntersectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let report = try await OrientSvc.shared.report(.upcoming, rank: 3, prefs: prefs)
@@ -146,7 +134,7 @@ struct MyDirectionIntent: AppIntent {
 	static var openAppWhenRun = false
 
 	@MainActor
-	func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+	func perform() async throws -> some IntentResult & ProvidesDialog {
 		do {
 			let prefs = AppPrefs.saved()
 			let provider = LocationProvider()
