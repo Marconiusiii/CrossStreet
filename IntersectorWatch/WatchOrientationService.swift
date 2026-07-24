@@ -2363,6 +2363,18 @@ struct WatchIntersectionBuilder {
 			guard names.count >= 2, let coordinate = nodes[nodeID] else {
 				return nil
 			}
+			// A junction that is a hand-verified pedestrian crossing (the Riverside
+			// Drive split blocks) is announced as a crossing instead of a plain
+			// intersection when crossings are enabled, so the two never both appear.
+			if options.includeCrossings,
+				let curated = WatchCuratedCrossings.entry(forJunctionNamed: names) {
+				return WatchIntersectionCandidate(
+					id: "crossing-junction-\(nodeID)",
+					names: [WatchCuratedCrossings.title(for: curated)],
+					coordinate: coordinate,
+					associatedRoadNames: [curated.road]
+				)
+			}
 			return WatchIntersectionCandidate(
 				id: String(nodeID),
 				names: names.sorted(),

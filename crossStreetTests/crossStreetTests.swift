@@ -549,33 +549,21 @@ struct IntersectorTests {
 		#expect(crossing.intersectionDetails?.hasPedestrianIsland == true)
 	}
 
-	// Mirrors the real mapping at Riverside Drive corners (99th–106th): a marked
-	// corner crosswalk sits a few metres from the junction node shared by two named
-	// streets. It must survive even though it is not mid-block.
-	@Test func markedCornerCrossingSurvivesNearJunction() async throws {
-		// Junction node (1) is shared by Riverside Drive and West 99th Street.
-		// Crossing node (2) is a marked crosswalk ~7 m north on Riverside Drive.
-		let response = OverpassResponse(elements: [
+	// A curated junction (Riverside Drive at West 99th Street) is announced as a
+	// crossing when crossings are enabled, and the plain intersection at that node is
+	// suppressed so the two never both appear.
+	private func riversideJunctionResponse() -> OverpassResponse {
+		// Node 1 is the shared Riverside Drive / West 99th Street junction node.
+		OverpassResponse(elements: [
 			OverpassElement(type: "node", id: 1, lat: 40.79789, lon: -73.97346, nodes: nil, tags: nil),
-			OverpassElement(
-				type: "node",
-				id: 2,
-				lat: 40.797955,
-				lon: -73.97346,
-				nodes: nil,
-				tags: [
-					"highway": "crossing",
-					"crossing": "marked",
-					"crossing:markings": "zebra"
-				]
-			),
-			OverpassElement(type: "node", id: 3, lat: 40.79860, lon: -73.97346, nodes: nil, tags: nil),
+			OverpassElement(type: "node", id: 2, lat: 40.79860, lon: -73.97346, nodes: nil, tags: nil),
+			OverpassElement(type: "node", id: 3, lat: 40.79789, lon: -73.97250, nodes: nil, tags: nil),
 			OverpassElement(
 				type: "way",
 				id: 10,
 				lat: nil,
 				lon: nil,
-				nodes: [1, 2, 3],
+				nodes: [1, 2],
 				tags: ["highway": "residential", "name": "Riverside Drive"]
 			),
 			OverpassElement(
@@ -583,45 +571,52 @@ struct IntersectorTests {
 				id: 11,
 				lat: nil,
 				lon: nil,
-				nodes: [1],
+				nodes: [1, 3],
 				tags: ["highway": "residential", "name": "West 99th Street"]
 			)
 		])
-
-		let mapData = IntersectionBuilder().mapData(
-			from: response,
-			options: MapDetailOptions(includeCrossings: true)
-		)
-
-		let crossing = mapData.intersections.first { $0.id == "crossing-2" }
-		#expect(crossing != nil)
-		#expect(crossing?.names.first == "Crossing on Riverside Drive near West 99th Street")
 	}
 
-	// An untagged/unmarked corner node at the same distance from a junction is a
-	// phantom and must still be suppressed.
-	@Test func unmarkedCornerCrossingIsSuppressedNearJunction() async throws {
+	@Test func curatedJunctionBecomesCrossingWhenEnabled() async throws {
+		let mapData = IntersectionBuilder().mapData(
+			from: riversideJunctionResponse(),
+			options: MapDetailOptions(includeCrossings: true)
+		)
+
+		// The curated crossing replaces the plain intersection at the junction node.
+		let crossing = mapData.intersections.first { $0.id == "crossing-junction-1" }
+		#expect(crossing != nil)
+		#expect(crossing?.names.first == "Crossing Riverside Drive at West 99th Street")
+		#expect(crossing?.roadNames == ["Riverside Drive"])
+		// No plain intersection for the same node survives.
+		#expect(mapData.intersections.first { $0.id == "1" } == nil)
+	}
+
+	@Test func curatedJunctionStaysPlainIntersectionWhenCrossingsOff() async throws {
+		let mapData = IntersectionBuilder().mapData(
+			from: riversideJunctionResponse()
+		)
+
+		// With crossings off, it is an ordinary intersection and no crossing appears.
+		let intersection = mapData.intersections.first { $0.id == "1" }
+		#expect(intersection != nil)
+		#expect(intersection?.names == ["Riverside Drive", "West 99th Street"])
+		#expect(mapData.intersections.first { $0.id.hasPrefix("crossing-") } == nil)
+	}
+
+	// A non-curated street meeting Riverside Drive stays a plain intersection even with
+	// crossings on — curated crossings must not leak to ordinary junctions.
+	@Test func nonCuratedRiversideJunctionStaysPlainIntersection() async throws {
 		let response = OverpassResponse(elements: [
-			OverpassElement(type: "node", id: 1, lat: 40.79789, lon: -73.97346, nodes: nil, tags: nil),
-			OverpassElement(
-				type: "node",
-				id: 2,
-				lat: 40.797955,
-				lon: -73.97346,
-				nodes: nil,
-				tags: [
-					"highway": "crossing",
-					"crossing": "unmarked",
-					"crossing:markings": "no"
-				]
-			),
-			OverpassElement(type: "node", id: 3, lat: 40.79860, lon: -73.97346, nodes: nil, tags: nil),
+			OverpassElement(type: "node", id: 1, lat: 40.79270, lon: -73.97710, nodes: nil, tags: nil),
+			OverpassElement(type: "node", id: 2, lat: 40.79340, lon: -73.97710, nodes: nil, tags: nil),
+			OverpassElement(type: "node", id: 3, lat: 40.79270, lon: -73.97610, nodes: nil, tags: nil),
 			OverpassElement(
 				type: "way",
 				id: 10,
 				lat: nil,
 				lon: nil,
-				nodes: [1, 2, 3],
+				nodes: [1, 2],
 				tags: ["highway": "residential", "name": "Riverside Drive"]
 			),
 			OverpassElement(
@@ -629,8 +624,8 @@ struct IntersectorTests {
 				id: 11,
 				lat: nil,
 				lon: nil,
-				nodes: [1],
-				tags: ["highway": "residential", "name": "West 99th Street"]
+				nodes: [1, 3],
+				tags: ["highway": "residential", "name": "West 91st Street"]
 			)
 		])
 
@@ -639,7 +634,10 @@ struct IntersectorTests {
 			options: MapDetailOptions(includeCrossings: true)
 		)
 
-		#expect(mapData.intersections.first { $0.id == "crossing-2" } == nil)
+		let intersection = mapData.intersections.first { $0.id == "1" }
+		#expect(intersection != nil)
+		#expect(intersection?.names == ["Riverside Drive", "West 91st Street"])
+		#expect(mapData.intersections.first { $0.id.hasPrefix("crossing-") } == nil)
 	}
 
 	@Test func multipleReportsShareMatchingNeighborhoodTextOnce() async throws {

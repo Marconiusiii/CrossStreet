@@ -706,6 +706,18 @@ struct IntersectionBuilder {
 			guard names.count >= 2, let coordinate = nodes[nodeID] else {
 				return nil
 			}
+			// A junction that is a hand-verified pedestrian crossing (the Riverside
+			// Drive split blocks) is announced as a crossing instead of a plain
+			// intersection when crossings are enabled, so the two never both appear.
+			if options.includeCrossings,
+				let curated = CuratedCrossings.entry(forJunctionNamed: names) {
+				return IntersectionCandidate(
+					id: "crossing-junction-\(nodeID)",
+					names: [CuratedCrossings.title(for: curated)],
+					coordinate: coordinate,
+					associatedRoadNames: [curated.road]
+				)
+			}
 			return IntersectionCandidate(
 				id: String(nodeID),
 				names: names.sorted(),
@@ -720,8 +732,7 @@ struct IntersectionBuilder {
 					element.type == "node",
 					isCrossing(element.tags),
 					!serviceRoadNodeIDs.contains(element.id),
-					isGenuinelyMappedCrossing(element.tags)
-						|| !isRoadJunctionCrossing(element.id, namesByNode: namesByNode),
+					!isRoadJunctionCrossing(element.id, namesByNode: namesByNode),
 					let coordinate = nodes[element.id],
 					let road = crossingRoad(
 						for: element.id,
@@ -733,9 +744,8 @@ struct IntersectionBuilder {
 					return nil
 				}
 
-				guard shouldReportCrossing(
+				guard isConfidentMidBlockCrossing(
 					nodeID: element.id,
-					tags: element.tags,
 					at: coordinate,
 					on: road,
 					between: streetIntersections,
@@ -787,9 +797,8 @@ struct IntersectionBuilder {
 				return nil
 			}
 
-			guard shouldReportCrossing(
+			guard isConfidentMidBlockCrossing(
 				nodeID: element.id,
-				tags: element.tags,
 				at: coordinate,
 				on: road,
 				between: streetIntersections,
@@ -855,52 +864,13 @@ struct IntersectionBuilder {
 		return "Crossing on \(roadName) near \(anchor.contextLabel(on: roadName, minimal: true))"
 	}
 
-	private func shouldReportCrossing(
-		nodeID: Int64,
-		tags: [String: String]?,
-		at coordinate: CLLocationCoordinate2D,
-		on road: MapRoad,
-		between intersections: [IntersectionCandidate],
-		roads: [MapRoad]
-	) -> Bool {
-		// A crossing that is genuinely mapped as pedestrian infrastructure — marked,
-		// signalized, with an island, or with tactile paving — is worth reporting even
-		// when it sits at a corner of a real intersection. These are the marked corner
-		// crosswalks a blind pedestrian relies on. Only the untagged/unmarked corner
-		// nodes fall through to the mid-block test, which suppresses phantom corners.
-		if isGenuinelyMappedCrossing(tags) {
-			return true
-		}
-		return isConfidentMidBlockCrossing(
-			nodeID: nodeID,
-			at: coordinate,
-			on: road,
-			between: intersections,
-			roads: roads
-		)
-	}
-
-	// A crossing carries real, human-mapped detail when it is explicitly marked, is
-	// controlled by signals, provides a pedestrian island, or has tactile paving.
-	// A bare corner node — `crossing=unmarked` or `crossing:markings=no` with nothing
-	// else — is treated as a phantom and left to the mid-block distance test.
-	private func isGenuinelyMappedCrossing(_ tags: [String: String]?) -> Bool {
-		guard let tags else {
-			return false
-		}
-		let crossing = tags["crossing"]?.lowercased()
-		let unmarkedKinds: Set<String> = ["unmarked", "no"]
-		let markings = tags["crossing:markings"]?.lowercased()
-		let isMarked = (markings != nil && markings != "no")
-			|| (crossing.map { !unmarkedKinds.contains($0) } ?? false)
-		return isMarked
-			|| crossing == "traffic_signals"
-			|| isPositive(tags["crossing:signals"])
-			|| crossing == "island"
-			|| isPositive(tags["crossing:island"])
-			|| isPositive(tags["tactile_paving"])
-	}
-
+	// A mapped pedestrian crossing is only reported when it genuinely sits mid-block on
+	// a named street — away from any detected intersection and with no differently-named
+	// street traversing the same spot. This is the Columbus-style rule: it surfaces real
+	// mid-block pedestrian crossings while never adding crossing verbosity at ordinary
+	// intersections (whose corner crosswalks are already implied by the intersection).
+	// Junctions that should nonetheless read as crossings — such as the Riverside Drive
+	// split — are handled separately by the curated crossing table, not here.
 	private func isConfidentMidBlockCrossing(
 		nodeID: Int64,
 		at coordinate: CLLocationCoordinate2D,
