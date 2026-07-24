@@ -720,7 +720,8 @@ struct IntersectionBuilder {
 					element.type == "node",
 					isCrossing(element.tags),
 					!serviceRoadNodeIDs.contains(element.id),
-					!isRoadJunctionCrossing(element.id, namesByNode: namesByNode),
+					isGenuinelyMappedCrossing(element.tags)
+						|| !isRoadJunctionCrossing(element.id, namesByNode: namesByNode),
 					let coordinate = nodes[element.id],
 					let road = crossingRoad(
 						for: element.id,
@@ -732,8 +733,9 @@ struct IntersectionBuilder {
 					return nil
 				}
 
-				guard isConfidentMidBlockCrossing(
+				guard shouldReportCrossing(
 					nodeID: element.id,
+					tags: element.tags,
 					at: coordinate,
 					on: road,
 					between: streetIntersections,
@@ -785,8 +787,9 @@ struct IntersectionBuilder {
 				return nil
 			}
 
-			guard isConfidentMidBlockCrossing(
+			guard shouldReportCrossing(
 				nodeID: element.id,
+				tags: element.tags,
 				at: coordinate,
 				on: road,
 				between: streetIntersections,
@@ -850,6 +853,52 @@ struct IntersectionBuilder {
 			return "Crossing on \(roadName)"
 		}
 		return "Crossing on \(roadName) near \(anchor.contextLabel(on: roadName, minimal: true))"
+	}
+
+	private func shouldReportCrossing(
+		nodeID: Int64,
+		tags: [String: String]?,
+		at coordinate: CLLocationCoordinate2D,
+		on road: MapRoad,
+		between intersections: [IntersectionCandidate],
+		roads: [MapRoad]
+	) -> Bool {
+		// A crossing that is genuinely mapped as pedestrian infrastructure — marked,
+		// signalized, with an island, or with tactile paving — is worth reporting even
+		// when it sits at a corner of a real intersection. These are the marked corner
+		// crosswalks a blind pedestrian relies on. Only the untagged/unmarked corner
+		// nodes fall through to the mid-block test, which suppresses phantom corners.
+		if isGenuinelyMappedCrossing(tags) {
+			return true
+		}
+		return isConfidentMidBlockCrossing(
+			nodeID: nodeID,
+			at: coordinate,
+			on: road,
+			between: intersections,
+			roads: roads
+		)
+	}
+
+	// A crossing carries real, human-mapped detail when it is explicitly marked, is
+	// controlled by signals, provides a pedestrian island, or has tactile paving.
+	// A bare corner node — `crossing=unmarked` or `crossing:markings=no` with nothing
+	// else — is treated as a phantom and left to the mid-block distance test.
+	private func isGenuinelyMappedCrossing(_ tags: [String: String]?) -> Bool {
+		guard let tags else {
+			return false
+		}
+		let crossing = tags["crossing"]?.lowercased()
+		let unmarkedKinds: Set<String> = ["unmarked", "no"]
+		let markings = tags["crossing:markings"]?.lowercased()
+		let isMarked = (markings != nil && markings != "no")
+			|| (crossing.map { !unmarkedKinds.contains($0) } ?? false)
+		return isMarked
+			|| crossing == "traffic_signals"
+			|| isPositive(tags["crossing:signals"])
+			|| crossing == "island"
+			|| isPositive(tags["crossing:island"])
+			|| isPositive(tags["tactile_paving"])
 	}
 
 	private func isConfidentMidBlockCrossing(
