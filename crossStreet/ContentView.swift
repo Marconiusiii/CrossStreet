@@ -77,7 +77,7 @@ private enum LoadingThrobber {
 			IntersectorAudioSession.prepareForFeedback()
 			if player == nil {
 				player = try AVAudioPlayer(data: cueData())
-				player?.volume = 0.42
+				player?.volume = 0.6
 				player?.numberOfLoops = -1
 				player?.prepareToPlay()
 			}
@@ -251,7 +251,7 @@ private enum ReadyEarcon {
 		do {
 			IntersectorAudioSession.prepareForFeedback()
 			player = try AVAudioPlayer(data: cueData())
-			player?.volume = 0.42
+			player?.volume = 0.6
 			player?.prepareToPlay()
 			player?.play()
 		} catch {}
