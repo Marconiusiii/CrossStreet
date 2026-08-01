@@ -2158,6 +2158,11 @@ private extension WatchOverpassElement {
 }
 
 struct WatchIntersectionBuilder {
+	private static let streetIntersectionDuplicateRadiusMeters: CLLocationDistance = 30
+	private static let cornerCrosswalkAnchorRadiusMeters: CLLocationDistance = 75
+	private static let cornerCrosswalkClusterRadiusMeters: CLLocationDistance = 45
+	private static let cornerCrosswalkClusterCount = 2
+
 	static let publicStreetHighways: Set<String> = [
 		"primary",
 		"primary_link",
@@ -2236,6 +2241,7 @@ struct WatchIntersectionBuilder {
 		}
 		if options.includeCrossings {
 			let streetIntersections = intersections
+			let crossingNodeCoordinates = crossingNodeCoordinates(from: response.elements)
 			let crossingCandidates = response.elements.compactMap { element -> WatchIntersectionCandidate? in
 				guard
 					element.type == "node",
@@ -2251,10 +2257,12 @@ struct WatchIntersectionBuilder {
 				else {
 					return nil
 				}
-				let duplicatesStreetIntersection = streetIntersections.contains {
-					WatchGeo.distanceMeters(from: $0.coordinate, to: coordinate) < 30
-				}
-				guard !duplicatesStreetIntersection else {
+				guard !shouldSuppressCrossing(
+					at: coordinate,
+					on: road,
+					streetIntersections: streetIntersections,
+					crossingNodeCoordinates: crossingNodeCoordinates
+				) else {
 					return nil
 				}
 				let anchor = nearestIntersection(
@@ -2296,6 +2304,7 @@ struct WatchIntersectionBuilder {
 
 		var intersections = coreData.intersections
 		let streetIntersections = intersections.filter { !$0.id.hasPrefix("crossing-") }
+		let crossingNodeCoordinates = crossingNodeCoordinates(from: crossingResponse.elements)
 		let crossingCandidates = crossingResponse.elements.compactMap { element -> WatchIntersectionCandidate? in
 			guard
 				element.type == "node",
@@ -2305,10 +2314,12 @@ struct WatchIntersectionBuilder {
 			else {
 				return nil
 			}
-			let duplicatesStreetIntersection = streetIntersections.contains {
-				WatchGeo.distanceMeters(from: $0.coordinate, to: coordinate) < 30
-			}
-			guard !duplicatesStreetIntersection else {
+			guard !shouldSuppressCrossing(
+				at: coordinate,
+				on: road,
+				streetIntersections: streetIntersections,
+				crossingNodeCoordinates: crossingNodeCoordinates
+			) else {
 				return nil
 			}
 			let anchor = nearestIntersection(
@@ -2344,6 +2355,41 @@ struct WatchIntersectionBuilder {
 		let updatedIDs = Set(intersections.map(\.id))
 		intersections.append(contentsOf: crossingWayCandidates.filter { !updatedIDs.contains($0.id) })
 		return WatchMapDataSet(intersections: intersections, roads: coreData.roads)
+	}
+
+	private func crossingNodeCoordinates(from elements: [WatchOverpassElement]) -> [CLLocationCoordinate2D] {
+		elements.compactMap { element in
+			guard element.type == "node", isCrossing(element.tags) else {
+				return nil
+			}
+			return element.coordinate
+		}
+	}
+
+	private func shouldSuppressCrossing(
+		at coordinate: CLLocationCoordinate2D,
+		on road: WatchMapRoad,
+		streetIntersections: [WatchIntersectionCandidate],
+		crossingNodeCoordinates: [CLLocationCoordinate2D]
+	) -> Bool {
+		if streetIntersections.contains(where: {
+			WatchGeo.distanceMeters(from: $0.coordinate, to: coordinate) < Self.streetIntersectionDuplicateRadiusMeters
+		}) {
+			return true
+		}
+
+		guard
+			let anchor = nearestIntersection(to: coordinate, on: road.name, in: streetIntersections),
+			anchor.roadNames.count >= 2,
+			WatchGeo.distanceMeters(from: anchor.coordinate, to: coordinate) <= Self.cornerCrosswalkAnchorRadiusMeters
+		else {
+			return false
+		}
+
+		let nearbyCrossingCount = crossingNodeCoordinates.filter {
+			WatchGeo.distanceMeters(from: $0, to: coordinate) <= Self.cornerCrosswalkClusterRadiusMeters
+		}.count
+		return nearbyCrossingCount >= Self.cornerCrosswalkClusterCount
 	}
 
 	private func isRoadJunctionCrossing(
@@ -2400,7 +2446,7 @@ struct WatchIntersectionBuilder {
 				return nil
 			}
 			let duplicatesStreetIntersection = streetIntersections.contains {
-				WatchGeo.distanceMeters(from: $0.coordinate, to: coordinate) < 30
+				WatchGeo.distanceMeters(from: $0.coordinate, to: coordinate) < Self.streetIntersectionDuplicateRadiusMeters
 			}
 			guard !duplicatesStreetIntersection else {
 				return nil
