@@ -13,7 +13,12 @@ private let watchLookupLoadingText = "Intersecting..."
 @MainActor
 private enum WatchVoiceOverAnnouncer {
 	static func reportUpdated(_ text: String) {
-		AccessibilityNotification.Announcement(text).post()
+		Task { @MainActor in
+			try? await Task.sleep(for: .milliseconds(350))
+			var announcement = AttributedString(text)
+			announcement.accessibilitySpeechAnnouncementPriority = .high
+			AccessibilityNotification.Announcement(announcement).post()
+		}
 	}
 }
 
@@ -95,7 +100,7 @@ struct WatchContentView: View {
 	@AppStorage("spokenIntersectionCount") private var spokenIntersectionCountRaw = WatchSpokenIntersectionCount.one.rawValue
 	@AppStorage("includeAnnouncementDistance") private var includeAnnouncementDistance = true
 	@AppStorage("includeAnnouncementDirection") private var includeAnnouncementDirection = true
-	@AppStorage("includeAnnouncementNeighborhood") private var includeAnnouncementNeighborhood = true
+	@AppStorage("includeAnnouncementNeighborhood") private var includeAnnouncementNeighborhood = false
 	@AppStorage("includeIntersectionDetails") private var includeIntersectionDetails = false
 	@AppStorage("includeCrossings") private var includeCrossings = false
 	@AppStorage("includeWalkingPaths") private var includeWalkingPaths = false
@@ -108,7 +113,7 @@ struct WatchContentView: View {
 
 	private var prefs: WatchAppPrefs {
 		WatchAppPrefs(
-			areaMode: WatchAreaMode(rawValue: areaModeRaw) ?? .near,
+			areaMode: selectedAreaMode,
 			measurementUnit: WatchMeasurementUnit(rawValue: measurementUnitRaw) ?? .feet,
 			directionStyle: WatchDirectionStyle(rawValue: directionStyleRaw) ?? .words,
 			intersectionWording: .direct,
@@ -125,6 +130,11 @@ struct WatchContentView: View {
 			),
 			manhattanSnobMode: manhattanSnobMode
 		)
+	}
+
+	private var selectedAreaMode: WatchAreaMode {
+		let mode = WatchAreaMode(rawValue: areaModeRaw) ?? .near
+		return mode == .off ? .near : mode
 	}
 
 	var body: some View {

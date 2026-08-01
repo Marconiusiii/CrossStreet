@@ -522,7 +522,7 @@ actor MapDataCache {
 		}
 		return sameArea(
 			center: entry.center,
-			radiusMeters: max(entry.radiusMeters, radiusMeters),
+			radiusMeters: entry.radiusMeters,
 			as: coordinate,
 			requestedRadius: radiusMeters
 		)

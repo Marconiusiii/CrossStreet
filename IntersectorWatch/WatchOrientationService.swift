@@ -69,8 +69,9 @@ struct WatchAppPrefs: Equatable, Hashable {
 
 	nonisolated static func saved(from defaults: UserDefaults = .standard) -> WatchAppPrefs {
 		let announcementOptions = WatchAnnouncementOptions.saved(from: defaults)
+		let savedAreaMode = WatchAreaMode(rawValue: defaults.string(forKey: "areaMode") ?? "") ?? .near
 		return WatchAppPrefs(
-			areaMode: WatchAreaMode(rawValue: defaults.string(forKey: "areaMode") ?? "") ?? .near,
+			areaMode: savedAreaMode == .off ? .near : savedAreaMode,
 			measurementUnit: WatchMeasurementUnit(rawValue: defaults.string(forKey: "measurementUnit") ?? "") ?? .feet,
 			directionStyle: WatchDirectionStyle(rawValue: defaults.string(forKey: "directionStyle") ?? "") ?? .words,
 			intersectionWording: .direct,
@@ -106,18 +107,20 @@ struct WatchAnnouncementOptions: Equatable, Hashable {
 	}
 
 	nonisolated static func saved(from defaults: UserDefaults) -> WatchAnnouncementOptions {
+		let savedAreaMode = WatchAreaMode(rawValue: defaults.string(forKey: "areaMode") ?? "")
+		let neighborhoodFallback = savedAreaMode.map { $0 != .off } ?? false
 		let hasExplicitOptions =
 			defaults.object(forKey: "includeAnnouncementDistance") != nil ||
 			defaults.object(forKey: "includeAnnouncementDirection") != nil ||
 			defaults.object(forKey: "includeAnnouncementNeighborhood") != nil ||
 			defaults.object(forKey: "includeIntersectionDetails") != nil
 		guard hasExplicitOptions else {
-			return WatchAnnouncementOptions()
+			return WatchAnnouncementOptions(includeNeighborhood: neighborhoodFallback)
 		}
 		return WatchAnnouncementOptions(
 			includeDistance: defaults.object(forKey: "includeAnnouncementDistance") as? Bool ?? true,
 			includeDirection: defaults.object(forKey: "includeAnnouncementDirection") as? Bool ?? true,
-			includeNeighborhood: defaults.object(forKey: "includeAnnouncementNeighborhood") as? Bool ?? true,
+			includeNeighborhood: defaults.object(forKey: "includeAnnouncementNeighborhood") as? Bool ?? neighborhoodFallback,
 			includeIntersectionDetails: defaults.object(forKey: "includeIntersectionDetails") as? Bool ?? false
 		)
 	}
@@ -187,6 +190,7 @@ enum WatchMeasurementUnit: String, CaseIterable, Identifiable {
 
 enum WatchDirectionStyle: String, CaseIterable, Identifiable {
 	case words
+	case cardinal
 	case clockFace
 
 	var id: String { rawValue }
@@ -194,7 +198,9 @@ enum WatchDirectionStyle: String, CaseIterable, Identifiable {
 	var label: String {
 		switch self {
 		case .words:
-			"Words"
+			"Relative"
+		case .cardinal:
+			"Cardinal"
 		case .clockFace:
 			"Clock Face"
 		}
@@ -914,6 +920,14 @@ struct WatchOrientationReport: Equatable {
 		switch prefs.directionStyle {
 		case .words:
 			return relDir
+		case .cardinal:
+			guard let head else {
+				return nil
+			}
+			if prefs.manhattanSnobMode {
+				return "toward \(WatchGeo.manhattanDirection(for: head))"
+			}
+			return head
 		case .clockFace:
 			return relDegrees.map { Self.clockFaceDirection(from: $0) }
 		}

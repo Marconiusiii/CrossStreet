@@ -6,8 +6,10 @@
 //
 
 import AVFoundation
+import Darwin
 import MessageUI
 import SwiftUI
+import UIKit
 import WatchConnectivity
 
 private enum SettingsFocusTarget: Hashable {
@@ -474,13 +476,13 @@ private final class WatchSettingsSync: NSObject, WCSessionDelegate {
 
 struct ContentView: View {
 	@AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-	@AppStorage("areaMode") private var areaModeRaw = AreaMode.off.rawValue
+	@AppStorage("areaMode") private var areaModeRaw = AreaMode.near.rawValue
 	@AppStorage("measurementUnit") private var measurementUnitRaw = MeasurementUnit.feet.rawValue
 	@AppStorage("directionStyle") private var directionStyleRaw = DirectionStyle.words.rawValue
 	@AppStorage("spokenIntersectionCount") private var spokenIntersectionCountRaw = SpokenIntersectionCount.one.rawValue
 	@AppStorage("includeAnnouncementDistance") private var includeAnnouncementDistance = true
 	@AppStorage("includeAnnouncementDirection") private var includeAnnouncementDirection = true
-	@AppStorage("includeAnnouncementNeighborhood") private var includeAnnouncementNeighborhood = true
+	@AppStorage("includeAnnouncementNeighborhood") private var includeAnnouncementNeighborhood = false
 	@AppStorage("includeIntersectionDetails") private var includeIntersectionDetails = false
 	@AppStorage("includeCrossings") private var includeCrossings = false
 	@AppStorage("includeWalkingPaths") private var includeWalkingPaths = false
@@ -514,7 +516,7 @@ struct ContentView: View {
 
 	private var prefs: AppPrefs {
 		AppPrefs(
-			areaMode: AreaMode(rawValue: areaModeRaw) ?? .off,
+			areaMode: selectedAreaMode,
 			measurementUnit: MeasurementUnit(rawValue: measurementUnitRaw) ?? .feet,
 			directionStyle: DirectionStyle(rawValue: directionStyleRaw) ?? .words,
 			intersectionWording: .direct,
@@ -536,7 +538,7 @@ struct ContentView: View {
 
 	private var watchSettingsPayload: WatchSettingsPayload {
 		WatchSettingsPayload(
-			areaMode: areaModeRaw,
+			areaMode: selectedAreaMode.rawValue,
 			measurementUnit: measurementUnitRaw,
 			directionStyle: directionStyleRaw,
 			spokenIntersectionCount: spokenIntersectionCountRaw,
@@ -552,6 +554,11 @@ struct ContentView: View {
 
 	private var displayLayout: DisplayLayout {
 		DisplayLayout(rawValue: displayLayoutRaw) ?? .standard
+	}
+
+	private var selectedAreaMode: AreaMode {
+		let mode = AreaMode(rawValue: areaModeRaw) ?? .near
+		return mode == .off ? .near : mode
 	}
 
 	private var mapReadinessSignature: String {
@@ -639,6 +646,9 @@ struct ContentView: View {
 				settingsView
 			}
 			.onAppear {
+				if areaModeRaw == AreaMode.off.rawValue {
+					areaModeRaw = AreaMode.near.rawValue
+				}
 				if !startRequestedPointScanIfNeeded() {
 					prepareInitialLocationIfNeeded()
 				}
@@ -927,7 +937,7 @@ struct ContentView: View {
 
 	private var areaModeBinding: Binding<AreaMode> {
 		Binding {
-			prefs.areaMode
+			selectedAreaMode
 		} set: { areaMode in
 			areaModeRaw = areaMode.rawValue
 			settingsFocusTarget = .neighborhood
@@ -974,6 +984,9 @@ struct ContentView: View {
 		Binding {
 			includeAnnouncementNeighborhood
 		} set: { isEnabled in
+			if isEnabled, areaModeRaw == AreaMode.off.rawValue {
+				areaModeRaw = AreaMode.near.rawValue
+			}
 			includeAnnouncementNeighborhood = isEnabled
 			settingsFocusTarget = .announcementNeighborhood
 		}
@@ -1120,7 +1133,7 @@ struct ContentView: View {
 				MailComposerView(
 					recipient: "marco@marconius.com",
 					subject: "Intersector Feedback",
-					body: nil,
+					body: feedbackEmailBody,
 					onFinish: { _ in }
 				)
 			}
@@ -1240,11 +1253,11 @@ struct ContentView: View {
 			if includeAnnouncementNeighborhood {
 				settingsControlRow {
 					Picker("Neighborhood Context", selection: areaModeBinding) {
-						ForEach(AreaMode.allCases) { mode in
+						ForEach(AreaMode.selectableCases) { mode in
 							Text(mode.label).tag(mode)
 						}
 					}
-					.pickerStyle(.menu)
+					.pickerStyle(.segmented)
 					.accessibilityFocused($settingsFocusTarget, equals: .neighborhood)
 				}
 			}
@@ -1408,10 +1421,7 @@ struct ContentView: View {
 						body: "The chevron menus on Nearest and Upcoming expose 2nd and 3rd result actions. Nearest ranks by distance from you. Upcoming follows the direction your phone is facing and looks forward along your current street. You can hide the visible chevrons in Settings while keeping ranked actions available through VoiceOver, Siri, and Shortcuts."
 					)
 
-					helpSection(
-						title: "Announcement Settings",
-						body: "Use the Announcements settings to choose what Intersector includes when it speaks. Distance adds how far away the result is. Direction adds wording like ahead, left, right, or clock-face direction. Neighborhood adds nearby area context when map data can support it. Intersection Details can add useful details such as signalized crossings or pedestrian islands when that information is mapped."
-					)
+					announcementSettingsHelpSection
 
 					helpSection(
 						title: "Map Detail",
@@ -1464,6 +1474,33 @@ struct ContentView: View {
 				.lineLimit(nil)
 				.fixedSize(horizontal: false, vertical: true)
 		}
+	}
+
+	private var announcementSettingsHelpSection: some View {
+		VStack(alignment: .leading, spacing: 12) {
+			Text("Announcement Settings")
+				.font(.headline)
+				.foregroundStyle(Color.crossText)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
+				.accessibilityAddTraits(.isHeader)
+
+			Text("Use the Announcements settings to choose what Intersector includes in spoken and visible results.")
+
+			Text("Distance says approximately how far away the intersection is. You can choose feet or meters.")
+
+			Text("Direction says where the intersection is in relation to the way your phone is pointing. Relative uses words such as ahead, left, and right. Cardinal uses directions such as north or southwest. Clock Face uses positions such as 10 o’clock.")
+
+			Text("Neighborhood adds a neighborhood or local area name when one is available. Nearby only announces the area closest to your current location. Nearby and toward can also announce a different area in the direction your phone is pointing.")
+
+			Text("Intersection Details adds useful mapped information such as traffic signals and pedestrian islands. If a detail has not been added to the map, Intersector cannot announce it.")
+
+			Text("Spoken Intersections chooses whether Nearest and Upcoming speak one, two, or three results. Nearest reports the closest intersections. Upcoming reports the next intersections along the road ahead.")
+		}
+		.font(.body)
+		.foregroundStyle(Color.crossText)
+		.lineLimit(nil)
+		.fixedSize(horizontal: false, vertical: true)
 	}
 
 	private func settingsHeader(_ title: String) -> some View {
@@ -1832,9 +1869,42 @@ struct ContentView: View {
 		return "Copyright \(year) by Marco Salsiccia\nVersion \(version) (\(build))"
 	}
 
+	private var feedbackEmailBody: String {
+		let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+		let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+		let device = UIDevice.current
+		return """
+
+
+		---
+		Intersector version: \(version) (\(build))
+		Device: \(device.model) (\(deviceHardwareIdentifier))
+		OS: \(device.systemName) \(device.systemVersion)
+		"""
+	}
+
+	private var deviceHardwareIdentifier: String {
+		if let simulatorIdentifier = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] {
+			return simulatorIdentifier
+		}
+		var systemInfo = utsname()
+		uname(&systemInfo)
+		return withUnsafePointer(to: &systemInfo.machine) { pointer in
+			pointer.withMemoryRebound(to: CChar.self, capacity: 1) {
+				String(cString: $0)
+			}
+		}
+	}
+
 	private func openMailFallback() {
-		let subject = "Intersector Feedback".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-		guard let mailURL = URL(string: "mailto:marco@marconius.com?subject=\(subject)") else {
+		var components = URLComponents()
+		components.scheme = "mailto"
+		components.path = "marco@marconius.com"
+		components.queryItems = [
+			URLQueryItem(name: "subject", value: "Intersector Feedback"),
+			URLQueryItem(name: "body", value: feedbackEmailBody)
+		]
+		guard let mailURL = components.url else {
 			return
 		}
 		openURL(mailURL)

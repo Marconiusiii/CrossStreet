@@ -21,7 +21,21 @@ struct IntersectorTests {
 		let prefs = AppPrefs.saved(from: defaults)
 
 		#expect(AppPrefs().areaMode == .off)
-		#expect(prefs.areaMode == .off)
+		#expect(prefs.areaMode == .near)
+		#expect(!prefs.announcementOptions.includeNeighborhood)
+		#expect(AreaMode.selectableCases == [.near, .toward])
+	}
+
+	@Test @MainActor func legacyNeighborhoodOffMigratesToDisabledNearbyMode() throws {
+		let suiteName = "IntersectorTests.legacyNeighborhood.\(UUID().uuidString)"
+		let defaults = try #require(UserDefaults(suiteName: suiteName))
+		defer { defaults.removePersistentDomain(forName: suiteName) }
+		defaults.set(AreaMode.off.rawValue, forKey: "areaMode")
+
+		let prefs = AppPrefs.saved(from: defaults)
+
+		#expect(prefs.areaMode == .near)
+		#expect(!prefs.announcementOptions.includeNeighborhood)
 	}
 
 	@Test func announcementOptionsCanSpeakIntersectionNameOnly() async throws {
@@ -179,6 +193,58 @@ struct IntersectorTests {
 
 		#expect(report.text(with: prefs) == "Nearest: Amsterdam Avenue and West 94th Street, about 120 feet ahead.")
 		#expect(Geo.localizedDirection(180, prefs: prefs) == "Downtown")
+	}
+
+	@Test func cardinalDirectionStyleUsesGeographicBearing() async throws {
+		var prefs = AppPrefs()
+		prefs.areaMode = .off
+		prefs.directionStyle = .cardinal
+		let report = OrientReport(
+			kind: .upcoming,
+			cross: "Riverside Drive and West 100th Street",
+			dist: "300 feet",
+			relDir: "ahead and left",
+			relDegrees: 315,
+			street: "Riverside Drive",
+			head: "northwest",
+			area: nil,
+			toward: nil,
+			conf: .high
+		)
+
+		#expect(
+			report.text(with: prefs) ==
+				"Upcoming: Riverside Drive and West 100th Street, about 300 feet northwest."
+		)
+	}
+
+	@Test func cardinalDirectionStyleUsesManhattanWordingWhenEnabled() async throws {
+		var prefs = AppPrefs()
+		prefs.areaMode = .off
+		prefs.directionStyle = .cardinal
+		prefs.manhattanSnobMode = true
+		let report = OrientReport(
+			kind: .nearest,
+			cross: "Amsterdam Avenue and West 94th Street",
+			dist: "120 feet",
+			relDir: "ahead",
+			relDegrees: 0,
+			street: "Amsterdam Avenue",
+			head: "north",
+			area: nil,
+			toward: nil,
+			conf: .high
+		)
+
+		#expect(
+			report.text(with: prefs) ==
+				"Nearest: Amsterdam Avenue and West 94th Street, about 120 feet toward Uptown."
+		)
+	}
+
+	@Test func savedWordsDirectionStyleRemainsRelative() {
+		#expect(DirectionStyle(rawValue: "words") == .words)
+		#expect(DirectionStyle.words.label == "Relative")
 	}
 
 	@Test func manhattanSnobModeDoesNotOverrideClockFaceReports() async throws {
@@ -1958,6 +2024,23 @@ struct IntersectorTests {
 
 		#expect(first.intersections.first?.id == "fetch-1")
 		#expect(second.intersections.first?.id == "fetch-2")
+		#expect(await counter.count == 2)
+	}
+
+	@Test func mapDataCacheDoesNotReuseSmallerAreaForLargerRadius() async throws {
+		let cache = MapDataCache()
+		let counter = FetchCounter()
+		let origin = CLLocationCoordinate2D(latitude: 37.0, longitude: -122.0)
+
+		let first = try await cache.data(near: origin, radiusMeters: 225) {
+			await counter.nextDataSet()
+		}
+		let expanded = try await cache.data(near: origin, radiusMeters: 750) {
+			await counter.nextDataSet()
+		}
+
+		#expect(first.intersections.first?.id == "fetch-1")
+		#expect(expanded.intersections.first?.id == "fetch-2")
 		#expect(await counter.count == 2)
 	}
 

@@ -193,6 +193,14 @@ struct OrientReport: Equatable {
 		switch prefs.directionStyle {
 		case .words:
 			return relDir
+		case .cardinal:
+			guard let head else {
+				return nil
+			}
+			if prefs.manhattanSnobMode {
+				return "toward \(Geo.manhattanDirection(for: head))"
+			}
+			return head
 		case .clockFace:
 			return relDegrees.map { Self.clockFaceDirection(from: $0) }
 		}

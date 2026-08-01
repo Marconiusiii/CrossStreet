@@ -43,8 +43,9 @@ struct AppPrefs {
 	@MainActor
 	static func saved(from defaults: UserDefaults = .standard) -> AppPrefs {
 		let announcementOptions = AnnouncementOptions.saved(from: defaults)
+		let savedAreaMode = AreaMode(rawValue: defaults.string(forKey: "areaMode") ?? "") ?? .near
 		return AppPrefs(
-			areaMode: AreaMode(rawValue: defaults.string(forKey: "areaMode") ?? "") ?? .off,
+			areaMode: savedAreaMode == .off ? .near : savedAreaMode,
 			measurementUnit: MeasurementUnit(rawValue: defaults.string(forKey: "measurementUnit") ?? "") ?? .feet,
 			directionStyle: DirectionStyle(rawValue: defaults.string(forKey: "directionStyle") ?? "") ?? .words,
 			intersectionWording: .direct,
@@ -82,6 +83,8 @@ struct AnnouncementOptions: Equatable, Hashable, Sendable {
 
 	@MainActor
 	static func saved(from defaults: UserDefaults) -> AnnouncementOptions {
+		let savedAreaMode = AreaMode(rawValue: defaults.string(forKey: "areaMode") ?? "")
+		let neighborhoodFallback = savedAreaMode.map { $0 != .off } ?? false
 		let hasExplicitOptions =
 			defaults.object(forKey: "includeAnnouncementDistance") != nil ||
 			defaults.object(forKey: "includeAnnouncementDirection") != nil ||
@@ -92,7 +95,7 @@ struct AnnouncementOptions: Equatable, Hashable, Sendable {
 			return AnnouncementOptions(
 				includeDistance: defaults.object(forKey: "includeAnnouncementDistance") as? Bool ?? true,
 				includeDirection: defaults.object(forKey: "includeAnnouncementDirection") as? Bool ?? true,
-				includeNeighborhood: defaults.object(forKey: "includeAnnouncementNeighborhood") as? Bool ?? true,
+				includeNeighborhood: defaults.object(forKey: "includeAnnouncementNeighborhood") as? Bool ?? neighborhoodFallback,
 				includeIntersectionDetails: defaults.object(forKey: "includeIntersectionDetails") as? Bool ?? false
 			)
 		}
@@ -107,7 +110,7 @@ struct AnnouncementOptions: Equatable, Hashable, Sendable {
 		case .brief:
 			return AnnouncementOptions(includeNeighborhood: false)
 		case .standard:
-			return AnnouncementOptions()
+			return AnnouncementOptions(includeNeighborhood: neighborhoodFallback)
 		}
 	}
 }
@@ -141,6 +144,7 @@ enum AreaMode: String, CaseIterable, Identifiable {
 	case toward
 
 	var id: String { rawValue }
+	static let selectableCases: [AreaMode] = [.near, .toward]
 
 	var label: String {
 		switch self {
@@ -191,6 +195,7 @@ enum MeasurementUnit: String, CaseIterable, Identifiable {
 
 enum DirectionStyle: String, CaseIterable, Identifiable {
 	case words
+	case cardinal
 	case clockFace
 
 	var id: String { rawValue }
@@ -198,7 +203,9 @@ enum DirectionStyle: String, CaseIterable, Identifiable {
 	var label: String {
 		switch self {
 		case .words:
-			"Words"
+			"Relative"
+		case .cardinal:
+			"Cardinal"
 		case .clockFace:
 			"Clock Face"
 		}
