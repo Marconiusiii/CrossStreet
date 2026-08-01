@@ -2279,6 +2279,30 @@ struct IntersectorTests {
 		#expect(data.intersections.isEmpty)
 	}
 
+	@Test func intersectionBuilderDoesNotAttachServiceRoadCrossingNodeToNearbyPublicStreet() async throws {
+		let response = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 1, lat: 37.0000, lon: -122.0000, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 2, lat: 37.0010, lon: -122.0000, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 3, lat: 37.0005, lon: -122.00002, nodes: nil, tags: [
+					"highway": "crossing",
+					"crossing": "unmarked"
+				]),
+				OverpassElement(type: "node", id: 4, lat: 37.0005, lon: -122.0001, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 37.0005, lon: -121.9999, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [1, 2], tags: ["highway": "tertiary", "name": "Foothill Boulevard"]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 3, 5], tags: ["highway": "service"])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true)
+		)
+
+		#expect(data.intersections.isEmpty)
+	}
+
 	@Test func intersectionBuilderAnchorsCrossingsToNearbyIntersections() async throws {
 		let response = OverpassResponse(
 			elements: [
@@ -2369,6 +2393,37 @@ struct IntersectorTests {
 			"Crossing on Oak Street near Pine Street"
 		])
 		#expect(enrichedData.intersections.last?.intersectionDetails?.isSignalized == true)
+	}
+
+	@Test func intersectionBuilderDoesNotEnrichServiceRoadCrossingNodeOntoNearbyPublicStreet() async throws {
+		let coreResponse = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 1, lat: 37.0000, lon: -122.0000, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 2, lat: 37.0010, lon: -122.0000, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [1, 2], tags: ["highway": "tertiary", "name": "Foothill Boulevard"])
+			]
+		)
+		let crossingResponse = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 3, lat: 37.0005, lon: -122.00002, nodes: nil, tags: [
+					"highway": "crossing",
+					"crossing": "unmarked"
+				]),
+				OverpassElement(type: "node", id: 4, lat: 37.0005, lon: -122.0001, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 37.0005, lon: -121.9999, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 3, 5], tags: ["highway": "service"])
+			]
+		)
+		let builder = IntersectionBuilder()
+		let coreData = builder.mapData(from: coreResponse)
+
+		let enrichedData = builder.mapData(
+			from: crossingResponse,
+			options: MapDetailOptions(includeCrossings: true),
+			coreData: coreData
+		)
+
+		#expect(enrichedData.intersections.isEmpty)
 	}
 
 	@Test func intersectionBuilderSuppressesEnrichedCornerCrosswalkCluster() async throws {

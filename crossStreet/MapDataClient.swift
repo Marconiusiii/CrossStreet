@@ -260,9 +260,15 @@ struct MapDataClient: MapDataFetching {
 		let highwayPattern = highwayTypes.joined(separator: "|")
 		let crossingRadius = Int(min(radiusMeters, 225).rounded())
 		let crossingQueries = options.includeCrossings ? """
-		  node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="crossing"];
-		  node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["crossing"];
-		  way(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="footway"]["footway"="crossing"];
+		  (
+		    node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="crossing"];
+		    node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["crossing"];
+		  )->.crossingNodes;
+		  way(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="footway"]["footway"="crossing"]->.crossingWays;
+		  way(bn.crossingNodes)["highway"]->.crossingParentWays;
+		  .crossingNodes;
+		  .crossingWays;
+		  .crossingParentWays;
 		""" : ""
 		let body = """
 		[out:json][timeout:10];
@@ -296,9 +302,15 @@ struct MapDataClient: MapDataFetching {
 		let highwayPattern = highwayTypes.joined(separator: "|")
 		let crossingRadius = Int(min(radiusMeters, 450).rounded())
 		let crossingQueries = options.includeCrossings ? """
-		  node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="crossing"];
-		  node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["crossing"];
-		  way(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="footway"]["footway"="crossing"];
+		  (
+		    node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="crossing"];
+		    node(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["crossing"];
+		  )->.crossingNodes;
+		  way(around:\(crossingRadius),\(coordinate.latitude),\(coordinate.longitude))["highway"="footway"]["footway"="crossing"]->.crossingWays;
+		  way(bn.crossingNodes)["highway"]->.crossingParentWays;
+		  .crossingNodes;
+		  .crossingWays;
+		  .crossingParentWays;
 		""" : ""
 		let body = """
 		[out:json][timeout:10];
@@ -761,6 +773,7 @@ struct IntersectionBuilder {
 					element.type == "node",
 					isCrossing(element.tags),
 					!isRoadJunctionCrossing(element.id, namesByNode: publicRoadNamesByNode),
+					!crossingNodeIsClaimedOnlyByNonPublicWay(element.id, in: response.elements),
 					let coordinate = nodes[element.id],
 					let road = crossingRoad(
 						for: element.id,
@@ -825,6 +838,7 @@ struct IntersectionBuilder {
 			guard
 				element.type == "node",
 				isCrossing(element.tags),
+				!crossingNodeIsClaimedOnlyByNonPublicWay(element.id, in: crossingResponse.elements),
 				let coordinate = element.coordinate,
 				let road = coreData.roads.first(where: { $0.isPublicStreet && $0.contains(coordinate) })
 			else {
@@ -881,6 +895,26 @@ struct IntersectionBuilder {
 			}
 			return element.coordinate
 		}
+	}
+
+	private func crossingNodeIsClaimedOnlyByNonPublicWay(
+		_ nodeID: Int64,
+		in elements: [OverpassElement]
+	) -> Bool {
+		let containingHighways = elements.compactMap { element -> String? in
+			guard
+				element.type == "way",
+				element.nodes?.contains(nodeID) == true,
+				let highway = element.tags?["highway"]
+			else {
+				return nil
+			}
+			return highway
+		}
+		guard !containingHighways.isEmpty else {
+			return false
+		}
+		return !containingHighways.contains { Self.publicStreetHighways.contains($0) }
 	}
 
 	private func shouldSuppressCrossing(
