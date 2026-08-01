@@ -2167,6 +2167,118 @@ struct IntersectorTests {
 		#expect(data.intersections.map(\.title) == ["Crossing on Oak Street"])
 	}
 
+	@Test func intersectionBuilderKeepsCrossingAndServiceRoadIntersectionSeparate() async throws {
+		let response = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 1, lat: 40.7960, lon: -73.9720, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 2, lat: 40.7970, lon: -73.9720, nodes: nil, tags: ["highway": "crossing"]),
+				OverpassElement(type: "node", id: 3, lat: 40.7980, lon: -73.9720, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 4, lat: 40.7974, lon: -73.9717, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 40.7974, lon: -73.9713, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [1, 2, 3], tags: ["highway": "primary", "name": "Riverside Drive"]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 5], tags: ["highway": "residential", "name": "West 99th Street"]),
+				OverpassElement(type: "way", id: 12, lat: nil, lon: nil, nodes: [2, 4], tags: ["highway": "residential", "name": "Riverside Drive"])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true)
+		)
+
+		#expect(data.intersections.contains { $0.title == "Crossing on Riverside Drive near West 99th Street" })
+		#expect(data.intersections.contains { $0.title == "Riverside Drive and West 99th Street" })
+	}
+
+	@Test func intersectionBuilderKeepsColumbusStyleCrossingWayWithoutWalkingPaths() async throws {
+		let response = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 1, lat: 40.7940, lon: -73.9667, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 2, lat: 40.7947, lon: -73.9662, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 3, lat: 40.7954, lon: -73.9657, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 4, lat: 40.7947, lon: -73.9664, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 40.7947, lon: -73.9660, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [1, 2, 3], tags: ["highway": "primary", "name": "Columbus Avenue"]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 2, 5], tags: [
+					"highway": "footway",
+					"footway": "crossing",
+					"crossing": "traffic_signals",
+					"crossing:markings": "zebra",
+					"crossing:signals": "yes"
+				]),
+				OverpassElement(type: "way", id: 12, lat: nil, lon: nil, nodes: [4, 5], tags: [
+					"highway": "service",
+					"service": "driveway",
+					"access": "private"
+				])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true, includeWalkingPaths: false)
+		)
+
+		#expect(data.intersections.map(\.title) == ["Crossing on Columbus Avenue"])
+		#expect(data.intersections.first?.intersectionDetails?.isSignalized == true)
+	}
+
+	@Test func intersectionBuilderDoesNotSpeakNamedCrossingPathAsStreet() async throws {
+		let response = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 1, lat: 40.7940, lon: -73.9667, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 2, lat: 40.7947, lon: -73.9662, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 3, lat: 40.7954, lon: -73.9657, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 4, lat: 40.7947, lon: -73.9664, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 5, lat: 40.7947, lon: -73.9660, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [1, 2, 3], tags: ["highway": "primary", "name": "Columbus Avenue"]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [4, 2, 5], tags: [
+					"highway": "footway",
+					"name": "Pedestrian Connector",
+					"footway": "crossing",
+					"crossing": "marked",
+					"crossing:markings": "ladder"
+				])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true, includeWalkingPaths: true)
+		)
+
+		#expect(data.intersections.map(\.title) == ["Crossing on Columbus Avenue"])
+	}
+
+	@Test func intersectionBuilderDoesNotValidateCrossingFromServiceRoadOnly() async throws {
+		let response = OverpassResponse(
+			elements: [
+				OverpassElement(type: "node", id: 1, lat: 40.7947, lon: -73.9664, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 2, lat: 40.7947, lon: -73.9662, nodes: nil, tags: nil),
+				OverpassElement(type: "node", id: 3, lat: 40.7947, lon: -73.9660, nodes: nil, tags: nil),
+				OverpassElement(type: "way", id: 10, lat: nil, lon: nil, nodes: [1, 2, 3], tags: [
+					"highway": "service",
+					"name": "Private Drive",
+					"service": "driveway",
+					"access": "private"
+				]),
+				OverpassElement(type: "way", id: 11, lat: nil, lon: nil, nodes: [1, 2, 3], tags: [
+					"highway": "footway",
+					"footway": "crossing",
+					"crossing": "traffic_signals",
+					"crossing:markings": "zebra"
+				])
+			]
+		)
+
+		let data = IntersectionBuilder().mapData(
+			from: response,
+			options: MapDetailOptions(includeCrossings: true, includeWalkingPaths: true)
+		)
+
+		#expect(data.intersections.isEmpty)
+	}
+
 	@Test func intersectionBuilderAnchorsCrossingsToNearbyIntersections() async throws {
 		let response = OverpassResponse(
 			elements: [
