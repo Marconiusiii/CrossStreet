@@ -513,6 +513,8 @@ struct ContentView: View {
 	@StateObject private var pointScanner = PointScanController()
 	@State private var watchSettingsSync = WatchSettingsSync()
 	@AccessibilityFocusState private var settingsFocusTarget: SettingsFocusTarget?
+	private let mainActionBorderWidth: CGFloat = 3
+	private let scanActionBorderWidth: CGFloat = 9
 
 	private var prefs: AppPrefs {
 		AppPrefs(
@@ -605,6 +607,7 @@ struct ContentView: View {
 								nearestButton
 							}
 						}
+						.opacity(pointScanner.isScanning || pointScanner.isPreparing ? 0.58 : 1)
 						.frame(minHeight: actionMinHeight)
 						Group {
 							if showRankedControls {
@@ -622,13 +625,15 @@ struct ContentView: View {
 								upcomingButton
 							}
 						}
+						.opacity(pointScanner.isScanning || pointScanner.isPreparing ? 0.58 : 1)
 						.frame(minHeight: actionMinHeight)
 						actionButton(
 							"Direction",
 							systemImage: "safari.fill",
 							accessibilityLabel: "My Direction",
 							accessibilityHint: "Speaks cardinal direction.",
-							isDisabled: isDirectionLoading || isStartupLoading
+							isDisabled: isDirectionLoading || isStartupLoading,
+							isVisuallyDimmed: pointScanner.isScanning || pointScanner.isPreparing
 						) {
 							await updateDirection()
 						}
@@ -825,8 +830,9 @@ struct ContentView: View {
 			"Nearest",
 			systemImage: "location.fill",
 			accessibilityLabel: "Nearest Intersection",
-			isDisabled: isLoading || isStartupLoading || !isMapDataReady || pointScanner.isScanning || pointScanner.isPreparing,
-			drawsChrome: !showRankedControls
+			isDisabled: isStartupLoading || !isMapDataReady || pointScanner.isScanning || pointScanner.isPreparing,
+			drawsChrome: !showRankedControls,
+			isVisuallyDimmed: pointScanner.isScanning || pointScanner.isPreparing
 		) {
 			await updateReport(.nearest)
 		}
@@ -847,8 +853,9 @@ struct ContentView: View {
 			"Upcoming",
 			systemImage: "arrow.up.circle.fill",
 			accessibilityLabel: "Upcoming Intersection",
-			isDisabled: isLoading || isStartupLoading || !isMapDataReady || pointScanner.isScanning || pointScanner.isPreparing,
-			drawsChrome: !showRankedControls
+			isDisabled: isStartupLoading || !isMapDataReady || pointScanner.isScanning || pointScanner.isPreparing,
+			drawsChrome: !showRankedControls,
+			isVisuallyDimmed: pointScanner.isScanning || pointScanner.isPreparing
 		) {
 			await updateReport(.upcoming)
 		}
@@ -865,28 +872,26 @@ struct ContentView: View {
 	}
 
 	private var pointScanToggle: some View {
-		Toggle(
-			isOn: Binding(
-				get: { pointScanner.isScanning || pointScanner.isPreparing },
-				set: { enabled in
-					pointScanner.setScanning(enabled, prefs: prefs) { text in
-						statusText = text
-					}
-				}
-			)
-		) {
+		Button {
+			pointScanner.setScanning(!(pointScanner.isScanning || pointScanner.isPreparing), prefs: prefs) { text in
+				statusText = text
+			}
+		} label: {
 			actionLabel("Scan", systemImage: "dot.radiowaves.left.and.right")
-				.padding(.horizontal, 6)
+				.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
+				.contentShape(Rectangle())
 		}
-		.toggleStyle(.button)
+		.buttonStyle(.plain)
 		.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
 		.foregroundStyle(Color.crossButtonText)
 		.background(pointScanBackground)
-		.overlay(Rectangle().stroke(Color.crossButtonStrongBorder, lineWidth: 3))
+		.overlay(Rectangle().stroke(Color.crossButtonStrongBorder, lineWidth: scanActionBorderWidth))
 		.shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
 		.contentShape(Rectangle())
 		.disabled(isLoading || isStartupLoading)
 		.accessibilityLabel("Point and Scan")
+		.accessibilityValue(pointScanner.isScanning || pointScanner.isPreparing ? "On" : "Off")
+		.accessibilityAddTraits(pointScanner.isScanning || pointScanner.isPreparing ? .isSelected : [])
 	}
 
 	private var pointScanBackground: Color {
@@ -904,7 +909,7 @@ struct ContentView: View {
 				.frame(width: 48, alignment: .center)
 		}
 		.background(Color.crossBtn)
-		.overlay(Rectangle().stroke(Color.crossButtonStrongBorder, lineWidth: 2))
+		.overlay(Rectangle().stroke(Color.crossButtonStrongBorder, lineWidth: mainActionBorderWidth))
 		.shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
 		.contentShape(Rectangle())
 	}
@@ -931,7 +936,7 @@ struct ContentView: View {
 		}
 		.menuStyle(.button)
 		.buttonStyle(.plain)
-		.disabled(isLoading || isStartupLoading || !isMapDataReady || pointScanner.isScanning || pointScanner.isPreparing)
+		.disabled(isStartupLoading || !isMapDataReady || pointScanner.isScanning || pointScanner.isPreparing)
 		.accessibilityHidden(true)
 	}
 
@@ -1210,6 +1215,11 @@ struct ContentView: View {
 				.accessibilityFocused($settingsFocusTarget, equals: .displayLayout)
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
+			settingsControlRow {
+				Toggle("Show 2nd and 3rd Controls", isOn: rankedControlsBinding)
+					.accessibilityFocused($settingsFocusTarget, equals: .rankedControls)
+					.accessibilityHint("Toggles the visibility of the menu chevrons")
+			}
 		}
 	}
 
@@ -1270,20 +1280,36 @@ struct ContentView: View {
 				spokenIntersectionsControl
 			}
 			settingsHelperText(spokenIntersectionCountDescription)
-			settingsControlRow {
-				Toggle("Show 2nd and 3rd Controls", isOn: rankedControlsBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .rankedControls)
-					.accessibilityHint("Toggles the visibility of the menu chevrons")
-			}
-			settingsControlRow {
-				Text("Sample Announcement")
-					.font(.headline)
-					.foregroundStyle(Color.crossText)
-					.accessibilityAddTraits(.isHeader)
-					.frame(maxWidth: .infinity, alignment: .leading)
-			}
-			settingsHelperText(announcementSampleText)
+			sampleAnnouncementSection
 		}
+	}
+
+	private var sampleAnnouncementSection: some View {
+		VStack(alignment: .leading, spacing: 0) {
+			Text("Sample Announcement")
+				.font(.title3)
+				.fontWeight(.bold)
+				.foregroundStyle(Color.crossText)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
+				.padding(.horizontal, 16)
+				.padding(.top, 12)
+				.padding(.bottom, 6)
+				.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+				.contentShape(Rectangle())
+				.accessibilityAddTraits(.isHeader)
+			Text(announcementSampleText)
+				.font(.footnote)
+				.foregroundStyle(Color.crossText)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
+				.padding(.horizontal, 16)
+				.padding(.top, 4)
+				.padding(.bottom, 12)
+				.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+				.contentShape(Rectangle())
+		}
+		.background(Color.crossSettingsHelper)
 	}
 
 	private var settingsRegionalWordingSection: some View {
@@ -1572,9 +1598,11 @@ struct ContentView: View {
 		accessibilityHint: String? = nil,
 		isDisabled: Bool? = nil,
 		drawsChrome: Bool = true,
+		isVisuallyDimmed: Bool = false,
 		action: @escaping () async -> Void
 	) -> some View {
-		Button {
+		let disabled = isDisabled ?? (isLoading || isStartupLoading || pointScanner.isScanning || pointScanner.isPreparing)
+		return Button {
 			Task {
 				await action()
 			}
@@ -1587,10 +1615,11 @@ struct ContentView: View {
 		.frame(maxWidth: .infinity)
 		.foregroundStyle(Color.crossButtonText)
 		.background(drawsChrome ? Color.crossBtn : Color.clear)
-		.overlay(Rectangle().stroke(drawsChrome ? Color.crossButtonStrongBorder : Color.clear, lineWidth: 2))
+		.overlay(Rectangle().stroke(drawsChrome ? Color.crossButtonStrongBorder : Color.clear, lineWidth: mainActionBorderWidth))
 		.shadow(color: drawsChrome ? Color.black.opacity(0.18) : Color.clear, radius: 2, x: 0, y: 1)
+		.opacity(isVisuallyDimmed ? 0.58 : 1)
 		.contentShape(Rectangle())
-		.disabled(isDisabled ?? (isLoading || isStartupLoading || pointScanner.isScanning || pointScanner.isPreparing))
+		.disabled(disabled)
 		.accessibilityLabel(accessibilityLabel ?? title)
 		.accessibilityHint(accessibilityHint ?? "")
 	}
