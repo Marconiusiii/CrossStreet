@@ -607,7 +607,6 @@ struct ContentView: View {
 								nearestButton
 							}
 						}
-						.opacity(pointScanner.isScanning || pointScanner.isPreparing ? 0.58 : 1)
 						.frame(minHeight: actionMinHeight)
 						Group {
 							if showRankedControls {
@@ -625,7 +624,6 @@ struct ContentView: View {
 								upcomingButton
 							}
 						}
-						.opacity(pointScanner.isScanning || pointScanner.isPreparing ? 0.58 : 1)
 						.frame(minHeight: actionMinHeight)
 						actionButton(
 							"Direction",
@@ -1287,7 +1285,7 @@ struct ContentView: View {
 	private var sampleAnnouncementSection: some View {
 		VStack(alignment: .leading, spacing: 0) {
 			Text("Sample Announcement")
-				.font(.title3)
+				.font(.headline)
 				.fontWeight(.bold)
 				.foregroundStyle(Color.crossText)
 				.lineLimit(nil)
