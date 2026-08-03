@@ -630,8 +630,7 @@ struct ContentView: View {
 							systemImage: "safari.fill",
 							accessibilityLabel: "My Direction",
 							accessibilityHint: "Speaks cardinal direction.",
-							isDisabled: isDirectionLoading || isStartupLoading,
-							isVisuallyDimmed: pointScanner.isScanning || pointScanner.isPreparing
+							isDisabled: isDirectionLoading || isStartupLoading
 						) {
 							await updateDirection()
 						}
@@ -1600,6 +1599,8 @@ struct ContentView: View {
 		action: @escaping () async -> Void
 	) -> some View {
 		let disabled = isDisabled ?? (isLoading || isStartupLoading || pointScanner.isScanning || pointScanner.isPreparing)
+		let buttonFill = drawsChrome ? Color.crossBtn.opacity(isVisuallyDimmed ? 0.72 : 1) : Color.clear
+		let buttonBorder = drawsChrome ? Color.crossButtonStrongBorder.opacity(isVisuallyDimmed ? 0.72 : 1) : Color.clear
 		return Button {
 			Task {
 				await action()
@@ -1612,10 +1613,9 @@ struct ContentView: View {
 		.buttonStyle(.plain)
 		.frame(maxWidth: .infinity)
 		.foregroundStyle(Color.crossButtonText)
-		.background(drawsChrome ? Color.crossBtn : Color.clear)
-		.overlay(Rectangle().stroke(drawsChrome ? Color.crossButtonStrongBorder : Color.clear, lineWidth: mainActionBorderWidth))
+		.background(buttonFill)
+		.overlay(Rectangle().stroke(buttonBorder, lineWidth: mainActionBorderWidth))
 		.shadow(color: drawsChrome ? Color.black.opacity(0.18) : Color.clear, radius: 2, x: 0, y: 1)
-		.opacity(isVisuallyDimmed ? 0.58 : 1)
 		.contentShape(Rectangle())
 		.disabled(disabled)
 		.accessibilityLabel(accessibilityLabel ?? title)
