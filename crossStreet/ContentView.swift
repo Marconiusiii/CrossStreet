@@ -874,7 +874,7 @@ struct ContentView: View {
 				statusText = text
 			}
 		} label: {
-			actionLabel("Scan", systemImage: "dot.radiowaves.left.and.right")
+			actionLabel("Point", systemImage: "dot.radiowaves.left.and.right")
 				.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
 				.contentShape(Rectangle())
 		}
@@ -886,7 +886,6 @@ struct ContentView: View {
 		.shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
 		.contentShape(Rectangle())
 		.disabled(isLoading || isStartupLoading)
-		.accessibilityLabel("Point and Scan")
 		.accessibilityValue(pointScanner.isScanning || pointScanner.isPreparing ? "On" : "Off")
 		.accessibilityAddTraits(pointScanner.isScanning || pointScanner.isPreparing ? .isSelected : [])
 	}
@@ -1435,8 +1434,8 @@ struct ContentView: View {
 					)
 
 					helpSection(
-						title: "Point and Scan",
-						body: "Turn on Point and Scan for a live orientation mode. Point the top of your phone around you to scan for nearby intersections and crossings. Haptics get stronger as your phone lines up with a result, and Intersector speaks the result when you are pointing directly toward it."
+						title: "Point",
+						body: "Turn on Point for a live orientation mode. Point the top of your phone around you to scan for nearby intersections and crossings. Haptics get stronger as your phone lines up with a result, and Intersector speaks the result when you are pointing directly toward it."
 					)
 
 					helpSection(
@@ -1453,7 +1452,7 @@ struct ContentView: View {
 
 					helpSection(
 						title: "Siri and Shortcuts",
-						body: "Intersector includes shortcut actions for Nearest Intersection, Upcoming Intersection, My Direction, and Point and Scan. In the Shortcuts app, you can create your own phrase, such as Which way am I facing, and Siri can run that shortcut without needing you to say with Intersector."
+						body: "Intersector includes shortcut actions for Nearest Intersection, Upcoming Intersection, My Direction, and Point. In the Shortcuts app, you can create your own phrase, such as Which way am I facing, and Siri can run that shortcut without needing you to say with Intersector."
 					)
 
 					helpSection(

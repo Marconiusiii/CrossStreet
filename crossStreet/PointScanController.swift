@@ -48,7 +48,7 @@ final class PointScanController: ObservableObject {
 		}
 
 		isPreparing = true
-		let loadingText = "Point and Scan Loading..."
+		let loadingText = "Point Mode Loading..."
 		onUpdate(loadingText)
 		VoiceOverAnnouncer.reportUpdated(loadingText)
 		if prefs.haptics {
@@ -79,7 +79,7 @@ final class PointScanController: ObservableObject {
 				isPreparing = false
 				isScanning = true
 				stopPreparationHaptics()
-				let readyText = "Point and Scan Ready."
+				let readyText = "Point Mode Ready."
 				onUpdate(readyText)
 				VoiceOverAnnouncer.reportUpdated(readyText)
 
