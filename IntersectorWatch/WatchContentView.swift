@@ -225,22 +225,13 @@ struct WatchContentView: View {
 	}
 
 	private var statusView: some View {
-		VStack(alignment: .leading, spacing: 4) {
-			Text("Current Info")
-				.font(.headline)
-				.fontWeight(.semibold)
-				.foregroundStyle(.white)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-				.accessibilityAddTraits(.isHeader)
-			Text(statusText)
-				.font(.body)
-				.foregroundStyle(Color.watchCrossInv)
-				.multilineTextAlignment(.leading)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-		}
-		.frame(maxWidth: .infinity, alignment: .leading)
+		Text(statusText)
+			.font(.body)
+			.foregroundStyle(Color.watchCrossInv)
+			.multilineTextAlignment(.leading)
+			.lineLimit(nil)
+			.fixedSize(horizontal: false, vertical: true)
+			.frame(maxWidth: .infinity, alignment: .leading)
 		.padding(.horizontal, 10)
 		.padding(.vertical, 8)
 		.background(Color.watchCrossPanel)
