@@ -874,7 +874,7 @@ struct ContentView: View {
 				statusText = text
 			}
 		} label: {
-			actionLabel("Point", systemImage: "dot.radiowaves.left.and.right")
+			actionLabel("Scan", systemImage: "dot.radiowaves.left.and.right")
 				.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
 				.contentShape(Rectangle())
 		}
@@ -1434,8 +1434,8 @@ struct ContentView: View {
 					)
 
 					helpSection(
-						title: "Point",
-						body: "Turn on Point for a live orientation mode. Point the top of your phone around you to scan for nearby intersections and crossings. Haptics get stronger as your phone lines up with a result, and Intersector speaks the result when you are pointing directly toward it."
+						title: "Scan",
+						body: "Turn on Scan for a live orientation mode. Point the top of your phone around you to scan for nearby intersections and crossings. Haptics get stronger as your phone lines up with a result, and Intersector speaks the result when you are pointing directly toward it."
 					)
 
 					helpSection(
