@@ -8,7 +8,7 @@
 import CoreLocation
 import Foundation
 
-enum WatchReportKind {
+nonisolated enum WatchReportKind {
 	case nearest
 	case upcoming
 

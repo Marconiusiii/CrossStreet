@@ -281,7 +281,7 @@ private extension AnnouncementOptions {
 	}
 }
 
-enum ReportKind {
+nonisolated enum ReportKind {
 	case nearest
 	case upcoming
 	case scan

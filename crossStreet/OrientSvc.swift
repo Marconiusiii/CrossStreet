@@ -247,7 +247,11 @@ struct OrientSvc {
 					maxCount: 1
 				)
 			}
-			await upcomingCache.store(reports: reports, prefs: prefs, context: context)
+			await upcomingCache.store(
+				reports: reports,
+				prefsKey: upcomingPrefsKey(for: prefs),
+				context: context
+			)
 			guard reports.indices.contains(rank - 1) else {
 				throw OrientError.noIntersections
 			}
@@ -342,9 +346,29 @@ struct OrientSvc {
 			} catch {}
 		}
 		if kind == .upcoming {
-			await upcomingCache.store(reports: reports, prefs: prefs, context: context)
+			await upcomingCache.store(
+				reports: reports,
+				prefsKey: upcomingPrefsKey(for: prefs),
+				context: context
+			)
 		}
 		return IntersectionReportList(reports: reports).text(with: prefs)
+	}
+
+	private func upcomingPrefsKey(for prefs: AppPrefs) -> String {
+		[
+			prefs.areaMode.rawValue,
+			prefs.measurementUnit.rawValue,
+			prefs.directionStyle.rawValue,
+			prefs.intersectionWording.rawValue,
+			String(prefs.announcementOptions.includeDistance),
+			String(prefs.announcementOptions.includeDirection),
+			String(prefs.announcementOptions.includeNeighborhood),
+			String(prefs.announcementOptions.includeIntersectionDetails),
+			String(prefs.mapDetails.includeCrossings),
+			String(prefs.mapDetails.includeWalkingPaths),
+			String(prefs.manhattanSnobMode)
+		].joined(separator: "|")
 	}
 
 	private func prefsForFirstLookup(
@@ -877,25 +901,25 @@ actor UpcomingReportCache {
 	private var entry: Entry?
 	private let timeToLive: TimeInterval = 60
 
-	func store(reports: [OrientReport], prefs: AppPrefs, context: DeviceContext, now: Date = .now) {
+	func store(reports: [OrientReport], prefsKey: String, context: DeviceContext, now: Date = .now) {
 		guard !reports.isEmpty else {
 			return
 		}
 		entry = Entry(
 			reports: reports,
-			prefsKey: UpcomingPrefsKey(prefs),
+			prefsKey: prefsKey,
 			coordinate: context.coordinate,
 			headingDegrees: context.headingDegrees,
 			storedAt: now
 		)
 	}
 
-	func report(rank: Int, prefs: AppPrefs, context: DeviceContext, now: Date = .now) -> OrientReport? {
+	func report(rank: Int, prefsKey: String, context: DeviceContext, now: Date = .now) -> OrientReport? {
 		guard
 			rank > 1,
 			let entry,
 			now.timeIntervalSince(entry.storedAt) <= timeToLive,
-			entry.prefsKey == UpcomingPrefsKey(prefs),
+			entry.prefsKey == prefsKey,
 			entry.reports.indices.contains(rank - 1),
 			matches(entry, context: context)
 		else {
@@ -906,41 +930,37 @@ actor UpcomingReportCache {
 
 	private func matches(_ entry: Entry, context: DeviceContext) -> Bool {
 		guard
-			Geo.distanceMeters(from: entry.coordinate, to: context.coordinate) <= 25,
+			Self.distanceMeters(from: entry.coordinate, to: context.coordinate) <= 25,
 			let cachedHeading = entry.headingDegrees,
 			let currentHeading = context.headingDegrees
 		else {
 			return false
 		}
-		return IntersectionFinder().angleDelta(from: cachedHeading, to: currentHeading) <= 20
+		return Self.angleDelta(from: cachedHeading, to: currentHeading) <= 20
+	}
+
+	private static func distanceMeters(
+		from start: CLLocationCoordinate2D,
+		to end: CLLocationCoordinate2D
+	) -> CLLocationDistance {
+		CLLocation(latitude: start.latitude, longitude: start.longitude)
+			.distance(from: CLLocation(latitude: end.latitude, longitude: end.longitude))
+	}
+
+	private static func angleDelta(
+		from heading: CLLocationDirection,
+		to bearing: CLLocationDirection
+	) -> CLLocationDirection {
+		let rawDelta = abs(bearing - heading).truncatingRemainder(dividingBy: 360)
+		return min(rawDelta, 360 - rawDelta)
 	}
 
 	private struct Entry {
 		var reports: [OrientReport]
-		var prefsKey: UpcomingPrefsKey
+		var prefsKey: String
 		var coordinate: CLLocationCoordinate2D
 		var headingDegrees: CLLocationDirection?
 		var storedAt: Date
-	}
-}
-
-private struct UpcomingPrefsKey: Equatable {
-	var areaMode: AreaMode
-	var measurementUnit: MeasurementUnit
-	var directionStyle: DirectionStyle
-	var intersectionWording: IntersectionWording
-	var announcementOptions: AnnouncementOptions
-	var mapDetails: MapDetailOptions
-	var manhattanSnobMode: Bool
-
-	init(_ prefs: AppPrefs) {
-		areaMode = prefs.areaMode
-		measurementUnit = prefs.measurementUnit
-		directionStyle = prefs.directionStyle
-		intersectionWording = prefs.intersectionWording
-		announcementOptions = prefs.announcementOptions
-		mapDetails = prefs.mapDetails
-		manhattanSnobMode = prefs.manhattanSnobMode
 	}
 }
 
