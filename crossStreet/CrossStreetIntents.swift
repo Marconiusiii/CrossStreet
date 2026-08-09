@@ -349,13 +349,13 @@ enum LaunchKeys {
 }
 
 struct StartPointScanIntent: AppIntent {
-	static var title: LocalizedStringResource = "Start Point and Scan"
-	static var description = IntentDescription("Opens Intersector and starts live Point and Scan mode.")
+	static var title: LocalizedStringResource = "Start Scan Mode"
+	static var description = IntentDescription("Opens Intersector and starts Scan Mode.")
 	static var openAppWhenRun = true
 
 	func perform() async throws -> some IntentResult & ProvidesDialog {
 		UserDefaults.standard.set(true, forKey: await LaunchKeys.startPointScan)
-		return .result(dialog: "Opening Intersector with Point and Scan.")
+		return .result(dialog: "Opening Intersector in Scan Mode.")
 	}
 }
 
@@ -462,10 +462,10 @@ struct IntersectorShortcuts: AppShortcutsProvider {
 		AppShortcut(
 			intent: StartPointScanIntent(),
 			phrases: [
-				"Start Point and Scan in \(.applicationName)",
+				"Start Scan Mode in \(.applicationName)",
 				"Scan for intersections with \(.applicationName)"
 			],
-			shortTitle: "Point Scan",
+			shortTitle: "Scan Mode",
 			systemImageName: "dot.radiowaves.left.and.right"
 		)
 	}

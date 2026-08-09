@@ -47,7 +47,7 @@ These are the most important files:
   Defines the app's report models and converts a report into readable text.
 
 - `PointScanController.swift`
-  Runs Point and Scan mode, including warmup state, heading updates, cooldowns, haptics, and announcements.
+  Runs Scan Mode, including warmup state, heading updates, cooldowns, haptics, and announcements.
 
 - `CrossStreetIntents.swift`
   Defines Siri and Shortcuts actions using App Intents.
@@ -115,11 +115,11 @@ The main screen has these parts:
 5. Direction button
 6. Scan toggle
 
-The visible button labels are intentionally short so they hold up better with larger text sizes. Their accessibility labels still use the fuller action names, such as `Nearest Intersection`, `Upcoming Intersection`, `My Direction`, and `Point and Scan`.
+The visible button labels are intentionally short so they hold up better with larger text sizes. Their accessibility labels still use the fuller action names, such as `Nearest Intersection`, `Upcoming Intersection`, `My Direction`, and `Scan Mode`.
 
 Nearest and Upcoming can also show subtle chevron menu controls beside them. These menus give sighted and low-vision touch users access to 2nd and 3rd ranked results without adding four more full-width buttons. The menus are hidden from VoiceOver because the Nearest and Upcoming buttons already expose those same ranked choices as custom accessibility actions.
 
-Point and Scan uses a stronger border because it starts and stops a live mode. When it is preparing or scanning, its background changes from yellow to orange so the active state is visible without relying only on the other buttons becoming disabled.
+Scan Mode uses a stronger border because it starts and stops a live mode. When it is preparing or scanning, its background changes from yellow to orange so the active state is visible without relying only on the other buttons becoming disabled.
 
 The main screen uses a vertical `ScrollView` for all text sizes.
 
@@ -158,7 +158,9 @@ Important patterns:
 
 `ContentView` builds an `AppPrefs` value from the stored setting values when it needs to call the report service. That includes map detail settings, so the lookup code can tell whether crossings or walking paths should be included.
 
-`statusText` is the main piece of screen text for results and errors. When it changes, the Current Info area updates.
+`statusText` is the main piece of screen text for results and errors. The existing text stays visible while a new lookup runs. If the lookup lasts about two seconds, a native linear progress strip appears below Current Info without becoming a separate VoiceOver element. A low-priority VoiceOver status announcement says that Intersector is still finding the intersection. If the lookup continues for another eight seconds, a second low-priority status announcement explains that it is still working.
+
+When the result or error arrives, the progress strip disappears and the new text replaces the old text with a short fade. Without Reduce Motion, the incoming text also moves upward by four points. With Reduce Motion, the transition uses only the fade. A temporary outline emphasizes the changed Current Info region for low-vision users without flashing, and the completed result uses a high-priority VoiceOver announcement.
 
 ## What Happens When Nearest Intersection Is Pressed
 
@@ -172,13 +174,13 @@ await updateReport(.nearest)
 
 1. Checks `isLoading` so two reports do not run at the same time.
 2. Sets loading state.
-3. Changes `statusText` to an updating message.
-4. Calls `OrientSvc.shared.report(kind, prefs: prefs)`.
-5. Stores the returned `OrientReport`.
-6. Turns the report into text.
-7. Updates `statusText`.
-8. Sends an announcement through `VoiceOverAnnouncer`.
-9. Clears loading state.
+3. Starts a delayed loading task without replacing the existing Current Info text.
+4. Calls `OrientSvc.shared.spokenText(kind, prefs: prefs)`.
+5. Shows the progress strip and sends low-priority status announcements only if the lookup takes long enough.
+6. Cancels the delayed loading task when a result or error arrives.
+7. Replaces `statusText` using the fade and temporary low-vision emphasis.
+8. Sends the completed result or error through `VoiceOverAnnouncer.reportUpdated(_:)`.
+9. Clears loading state and hides the progress strip.
 
 The code path is:
 
@@ -425,7 +427,7 @@ manager.stopUpdatingLocation()
 
 That matters because location updates can continue until stopped. Good app code starts expensive system work only when needed and stops it when the task is done.
 
-Heading updates are handled similarly. Point and Scan keeps heading updates active while scanning. A one-shot fresh heading ignores invalid Core Location samples and briefly collects updates before using the latest value, which avoids treating the first intermediate reading during a quick phone movement as settled. If Upcoming still cannot align that heading with the loaded road geometry, it requests one more settled heading and reevaluates the same map data without forcing another network request. Other one-shot heading requests stop when they are finished if no stream still needs them.
+Heading updates are handled similarly. Scan Mode keeps heading updates active while scanning. A one-shot fresh heading ignores invalid Core Location samples and briefly collects updates before using the latest value, which avoids treating the first intermediate reading during a quick phone movement as settled. If Upcoming still cannot align that heading with the loaded road geometry, it requests one more settled heading and reevaluates the same map data without forcing another network request. Other one-shot heading requests stop when they are finished if no stream still needs them.
 
 ## MapDataClient
 
@@ -527,7 +529,7 @@ When crossings are enabled, a crossing node on one named road can also become a 
 
 The normal nearest and upcoming buttons mostly use `intersections`.
 
-Point and Scan also needs `roads`, because it first finds the road closest to the current coordinate and then filters intersections to that road.
+Scan Mode also needs `roads`, because it first finds the road closest to the current coordinate and then filters intersections to that road.
 
 That method is:
 
@@ -655,7 +657,7 @@ That separation is useful. The app can keep logic structured internally while st
 `ReportKind` is an enum:
 
 ```swift
-enum ReportKind {
+nonisolated enum ReportKind {
 	case nearest
 	case upcoming
 	case scan
@@ -668,7 +670,7 @@ Here, `ReportKind` lets the app pass one clear value through the system instead 
 
 That makes the compiler help you. If a new case is added later, Swift can point out places where the code needs to handle it.
 
-## Point And Scan
+## Scan Mode
 
 `PointScanController.swift` is an `ObservableObject`.
 
@@ -679,9 +681,9 @@ It publishes:
 @Published private(set) var isScanning = false
 ```
 
-`ContentView` observes those values through `@StateObject`. When they change, the Point and Scan toggle state updates.
+`ContentView` observes those values through `@StateObject`. When they change, the Scan Mode toggle state updates.
 
-Starting Point and Scan does this:
+Starting Scan Mode does this:
 
 1. Set preparing state.
 2. Update the status text to loading.
@@ -696,7 +698,7 @@ While scanning, each heading update is checked against nearby intersections. Whe
 
 ## Long-Running Tasks
 
-Point and Scan uses a stored task:
+Scan Mode uses a stored task:
 
 ```swift
 private var scanTask: Task<Void, Never>?
@@ -720,7 +722,7 @@ AsyncStream<CLLocationDirection>
 
 An `AsyncStream` lets code use a `for await` loop for values that arrive over time.
 
-Point and Scan uses:
+Scan Mode uses:
 
 ```swift
 for await heading in locationProvider.headingUpdates()
@@ -732,7 +734,7 @@ This is cleaner than making the scan controller itself a CoreLocation delegate.
 
 ## Cooldowns
 
-Point and Scan stores:
+Scan Mode stores:
 
 ```swift
 private var spokenCooldowns: [String: Date] = [:]
@@ -752,7 +754,7 @@ The pattern is simple and useful:
 
 `HapticFeedback.swift` centralizes haptic calls.
 
-Point and Scan uses haptics in two ways:
+Scan Mode uses haptics in two ways:
 
 - preparation pulses while the mode is loading
 - scan feedback when pointing near a candidate
@@ -767,7 +769,7 @@ The important design is that the app updates visible text and sends the same tex
 
 That keeps the visible state and spoken state aligned.
 
-Report announcements use the default announcement priority. The app does not move VoiceOver focus away from the button that triggered the report, so users can keep pressing the same action button if they want repeated updates.
+Completed report announcements use high priority. Longer-loading status announcements use low priority so they do not repeatedly interrupt commands or compete with the final result. The app does not move VoiceOver focus away from the button that triggered the report, so users can keep pressing the same action button if they want repeated updates.
 
 ## Settings
 
@@ -868,7 +870,7 @@ The watch app has:
 
 The watch App Intents return dialog text so Siri on Apple Watch has a spoken result to use.
 
-Point and Scan is not part of the first watch pass. It is a continuous heading-driven mode, while the first watch target is focused on short one-shot reports that make sense through Siri.
+Scan Mode is not part of the first watch pass. It is a continuous heading-driven mode, while the first watch target is focused on short one-shot reports that make sense through Siri.
 
 The watch target is embedded in the main Intersector iOS app target. That lets the watch app build along with the iOS app for TestFlight and App Store distribution.
 
@@ -931,7 +933,7 @@ They currently cover:
 
 - report text behavior
 - upcoming intersection matching
-- Point and Scan current-street filtering
+- Scan Mode current-street filtering
 - map cache reuse
 - map cache behavior for distant results
 - map cache behavior across several recent areas

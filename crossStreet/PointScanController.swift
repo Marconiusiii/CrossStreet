@@ -104,7 +104,7 @@ final class PointScanController: ObservableObject {
 				isScanning = false
 				scanTask = nil
 				stopPreparationHaptics()
-				let text = "Unable to start Point and Scan. \(error.localizedDescription)"
+				let text = "Unable to start Scan Mode. \(error.localizedDescription)"
 				onUpdate(text)
 				VoiceOverAnnouncer.reportUpdated(text)
 			}

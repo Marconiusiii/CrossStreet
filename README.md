@@ -6,7 +6,7 @@ Intersector is an accessibility-first iOS app for quickly identifying nearby int
 
 - Find the nearest mapped intersection from your current location.
 - Find an upcoming intersection based on your current heading.
-- Use live Point and Scan mode to point the phone toward nearby intersections on the street you are on.
+- Use Scan Mode to point the phone toward nearby intersections on the street you are on.
 - Start common actions through Siri Shortcuts without opening the app first.
 - Hear updated information through VoiceOver announcements.
 - Use optional haptic scan feedback while orienting the phone.
@@ -18,7 +18,7 @@ Intersector provides App Shortcuts for:
 
 - `Nearest intersection in Intersector`
 - `Upcoming intersection in Intersector`
-- `Start Point and Scan in Intersector`
+- `Start Scan Mode in Intersector`
 
 You can also create your own shortcut phrases using Intersector actions in the Shortcuts app.
 
@@ -26,7 +26,7 @@ You can also create your own shortcut phrases using Intersector actions in the S
 
 Intersector is built around VoiceOver-first use. The main screen uses large full-width action areas, native SwiftUI controls where possible, Dynamic Type-friendly text, and spoken announcements when intersection information updates.
 
-Point and Scan is intended as a live orientation feature: when enabled, it monitors heading changes, announces matching intersections, and provides haptic feedback as the phone points closer to an intersection.
+Scan Mode is a live orientation feature: when enabled, it monitors heading changes, announces matching intersections, and provides haptic feedback as the phone points closer to an intersection.
 
 ## Map Data
 
