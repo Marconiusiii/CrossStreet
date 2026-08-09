@@ -136,8 +136,8 @@ final class LocationProvider: NSObject, LocationProviding {
 					guard let self else {
 						return
 					}
-					let hasUsableLocation = bestActiveLocation.map(isUsable) ?? false
-					finishPrewarm(success: hasUsableLocation)
+					let hasUsableLocation = self.bestActiveLocation.map(self.isUsable) ?? false
+					self.finishPrewarm(success: hasUsableLocation)
 				}
 			}
 			manager.startUpdatingLocation()
