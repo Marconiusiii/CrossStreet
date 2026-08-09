@@ -45,7 +45,8 @@ private enum DisplayLayout: String, CaseIterable, Identifiable {
 	}
 }
 
-private let lookupLoadingText = "Intersecting..."
+private let lookupLoadingText = "Still finding the intersection."
+private let extendedLookupLoadingText = "Still working. Map data is taking longer than usual."
 private let startupLoadingText = "Loading Intersector."
 private let mapPreparationText = "Preparing map data for Nearest and Upcoming."
 private let mapWaitingText = "Waiting for map data. Nearest and Upcoming will become available automatically."
@@ -811,8 +812,7 @@ struct ContentView: View {
 				ProgressView()
 					.progressViewStyle(.linear)
 					.tint(Color.crossAccent)
-					.accessibilityLabel(loadingAccessibilityLabel)
-					.accessibilityValue("In progress")
+					.accessibilityHidden(true)
 			} else {
 				Color.clear
 					.accessibilityHidden(true)
@@ -826,19 +826,6 @@ struct ContentView: View {
 
 	private var isStatusLoading: Bool {
 		isStartupLoading || isMapPreparationLoading || isLookupProgressVisible || pointScanner.isPreparing
-	}
-
-	private var loadingAccessibilityLabel: String {
-		if isLookupProgressVisible {
-			return lookupLoadingText
-		}
-		if pointScanner.isPreparing {
-			return "Scan Mode Loading..."
-		}
-		if isMapPreparationLoading {
-			return mapPreparationText
-		}
-		return startupLoadingText
 	}
 
 	private var nearestButton: some View {
@@ -1703,21 +1690,17 @@ struct ContentView: View {
 		}
 		cancelStartupPreparationIfNeeded()
 		isLoading = true
-		let showsProgressImmediately = rank > 1
-		if showsProgressImmediately {
-			isLookupProgressVisible = true
-			LoadingThrobber.start(hapticsEnabled: prefs.haptics)
-			VoiceOverAnnouncer.reportUpdated(lookupLoadingText)
-		}
 		let loadingTask = Task { @MainActor in
 			do {
-				try await Task.sleep(for: .milliseconds(800))
-				guard !showsProgressImmediately else {
+				try await Task.sleep(for: .seconds(2))
+				guard !isMapPreparationLoading else {
 					return
 				}
 				isLookupProgressVisible = true
 				LoadingThrobber.start(hapticsEnabled: prefs.haptics)
-				VoiceOverAnnouncer.reportUpdated(lookupLoadingText)
+				VoiceOverAnnouncer.statusUpdated(lookupLoadingText)
+				try await Task.sleep(for: .seconds(8))
+				VoiceOverAnnouncer.statusUpdated(extendedLookupLoadingText)
 			} catch {}
 		}
 
@@ -1762,7 +1745,7 @@ struct ContentView: View {
 		isMapDataReady = false
 		isMapPreparationLoading = true
 		isLookupProgressVisible = true
-		VoiceOverAnnouncer.reportUpdated(mapWaitingText)
+		VoiceOverAnnouncer.statusUpdated(mapWaitingText)
 
 		var hasPreparedMapData = await OrientSvc.shared.prewarmInitialReportMapData(prefs: prefs)
 		while !hasPreparedMapData {
