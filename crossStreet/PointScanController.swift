@@ -48,7 +48,7 @@ final class PointScanController: ObservableObject {
 		}
 
 		isPreparing = true
-		let loadingText = "Point and Scan Loading..."
+		let loadingText = "Scan Mode Loading..."
 		onUpdate(loadingText)
 		VoiceOverAnnouncer.reportUpdated(loadingText)
 		if prefs.haptics {
@@ -79,7 +79,7 @@ final class PointScanController: ObservableObject {
 				isPreparing = false
 				isScanning = true
 				stopPreparationHaptics()
-				let readyText = "Point and Scan Ready."
+				let readyText = "Scan Mode Ready."
 				onUpdate(readyText)
 				VoiceOverAnnouncer.reportUpdated(readyText)
 
@@ -104,7 +104,7 @@ final class PointScanController: ObservableObject {
 				isScanning = false
 				scanTask = nil
 				stopPreparationHaptics()
-				let text = "Unable to start Point and Scan. \(error.localizedDescription)"
+				let text = "Unable to start Scan Mode. \(error.localizedDescription)"
 				onUpdate(text)
 				VoiceOverAnnouncer.reportUpdated(text)
 			}

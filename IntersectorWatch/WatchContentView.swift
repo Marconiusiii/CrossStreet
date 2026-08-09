@@ -12,12 +12,6 @@ private let watchLookupLoadingText = "Intersecting..."
 
 @MainActor
 private enum WatchVoiceOverAnnouncer {
-	/// Speak the freshly-updated result through VoiceOver. A plain announcement
-	/// posted the instant a button is activated collides with VoiceOver still
-	/// speaking that button, so the system drops it — which is why users had to
-	/// manually focus the Current Info row to hear the output. Marking the
-	/// announcement high priority tells VoiceOver to queue it rather than discard
-	/// it, and a short delay lets the activation speech settle first so it lands.
 	static func reportUpdated(_ text: String) {
 		Task { @MainActor in
 			try? await Task.sleep(for: .milliseconds(350))
@@ -231,22 +225,13 @@ struct WatchContentView: View {
 	}
 
 	private var statusView: some View {
-		VStack(alignment: .leading, spacing: 4) {
-			Text("Current Info")
-				.font(.headline)
-				.fontWeight(.semibold)
-				.foregroundStyle(.white)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-				.accessibilityAddTraits(.isHeader)
-			Text(statusText)
-				.font(.body)
-				.foregroundStyle(Color.watchCrossInv)
-				.multilineTextAlignment(.leading)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-		}
-		.frame(maxWidth: .infinity, alignment: .leading)
+		Text(statusText)
+			.font(.body)
+			.foregroundStyle(Color.watchCrossInv)
+			.multilineTextAlignment(.leading)
+			.lineLimit(nil)
+			.fixedSize(horizontal: false, vertical: true)
+			.frame(maxWidth: .infinity, alignment: .leading)
 		.padding(.horizontal, 10)
 		.padding(.vertical, 8)
 		.background(Color.watchCrossPanel)

@@ -8,17 +8,102 @@
 import AppIntents
 import Foundation
 
-/// Returns the spoken announcement as a plain dialog only. Siri speaks it and
-/// shows its own native dialog bubble — one correctly-formatted copy of the
-/// text. Earlier attempts paired the dialog with a custom snippet view, which
-/// rendered the text a second time (larger, left-justified, no margins) and
-/// forced a snippet card that appeared as an empty bubble while `perform()` was
-/// still fetching. Returning `ProvidesDialog` alone matches the native system
-/// behavior and avoids both problems.
 private func watchIntersectorResult(
 	_ text: String
 ) -> some IntentResult & ProvidesDialog {
 	.result(dialog: IntentDialog(stringLiteral: text))
+}
+
+struct WatchIntersectorShortcutResult: AppEntity {
+	typealias ID = String
+
+	static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Intersector Result")
+	static var defaultQuery = WatchIntersectorShortcutResultQuery()
+
+	var id: String
+
+	@Property(title: "Announcement Text")
+	var announcementText: String
+
+	@Property(title: "Intersection")
+	var intersection: String
+
+	@Property(title: "Distance")
+	var distance: String
+
+	@Property(title: "Direction")
+	var direction: String
+
+	@Property(title: "Heading")
+	var heading: String
+
+	@Property(title: "Neighborhood")
+	var neighborhood: String
+
+	@Property(title: "Toward")
+	var toward: String
+
+	@Property(title: "Details")
+	var details: String
+
+	var displayRepresentation: DisplayRepresentation {
+		DisplayRepresentation(title: "\(announcementText)")
+	}
+
+	init(
+		id: String = UUID().uuidString,
+		announcementText: String,
+		intersection: String = "",
+		distance: String = "",
+		direction: String = "",
+		heading: String = "",
+		neighborhood: String = "",
+		toward: String = "",
+		details: String = ""
+	) {
+		self.id = id
+		self.announcementText = announcementText
+		self.intersection = intersection
+		self.distance = distance
+		self.direction = direction
+		self.heading = heading
+		self.neighborhood = neighborhood
+		self.toward = toward
+		self.details = details
+	}
+}
+
+struct WatchIntersectorShortcutResultQuery: EntityQuery {
+	func entities(for identifiers: [WatchIntersectorShortcutResult.ID]) async throws -> [WatchIntersectorShortcutResult] {
+		[]
+	}
+
+	func suggestedEntities() async throws -> [WatchIntersectorShortcutResult] {
+		[]
+	}
+}
+
+@MainActor
+private func watchShortcutResult(
+	from report: WatchOrientationReport,
+	prefs: WatchAppPrefs,
+	rank: Int? = nil
+) -> WatchIntersectorShortcutResult {
+	let announcementText = if let rank {
+		report.text(with: prefs, rank: rank)
+	} else {
+		report.text(with: prefs)
+	}
+	return WatchIntersectorShortcutResult(
+		announcementText: announcementText,
+		intersection: report.cross,
+		distance: report.dist,
+		direction: report.relDir ?? "",
+		heading: report.head ?? "",
+		neighborhood: report.area ?? "",
+		toward: report.toward ?? "",
+		details: report.intersectionDetails?.spokenPhrases.joined(separator: ", ") ?? ""
+	)
 }
 
 struct WatchNearestIntersectionIntent: AppIntent {
@@ -54,6 +139,104 @@ struct WatchMyDirectionIntent: AppIntent {
 	func perform() async throws -> some IntentResult & ProvidesDialog {
 		let text = await IntersectorWatchReporter.directionText()
 		return watchIntersectorResult(text)
+	}
+}
+
+struct WatchGetNearestIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get Nearest Intersection"
+	static var description = IntentDescription("Gets the closest mapped intersection as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let report = try await WatchOrientationService().report(.nearest, prefs: prefs)
+		return .result(value: watchShortcutResult(from: report, prefs: prefs))
+	}
+}
+
+struct WatchGetSecondNearestIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 2nd Nearest Intersection"
+	static var description = IntentDescription("Gets the second closest mapped intersection as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let report = try await WatchOrientationService().report(.nearest, rank: 2, prefs: prefs)
+		return .result(value: watchShortcutResult(from: report, prefs: prefs, rank: 2))
+	}
+}
+
+struct WatchGetThirdNearestIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 3rd Nearest Intersection"
+	static var description = IntentDescription("Gets the third closest mapped intersection as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let report = try await WatchOrientationService().report(.nearest, rank: 3, prefs: prefs)
+		return .result(value: watchShortcutResult(from: report, prefs: prefs, rank: 3))
+	}
+}
+
+struct WatchGetUpcomingIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get Upcoming Intersection"
+	static var description = IntentDescription("Gets the mapped intersection ahead as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let report = try await WatchOrientationService().report(.upcoming, prefs: prefs)
+		return .result(value: watchShortcutResult(from: report, prefs: prefs))
+	}
+}
+
+struct WatchGetSecondUpcomingIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 2nd Upcoming Intersection"
+	static var description = IntentDescription("Gets the second mapped intersection ahead as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let report = try await WatchOrientationService().report(.upcoming, rank: 2, prefs: prefs)
+		return .result(value: watchShortcutResult(from: report, prefs: prefs, rank: 2))
+	}
+}
+
+struct WatchGetThirdUpcomingIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 3rd Upcoming Intersection"
+	static var description = IntentDescription("Gets the third mapped intersection ahead as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let report = try await WatchOrientationService().report(.upcoming, rank: 3, prefs: prefs)
+		return .result(value: watchShortcutResult(from: report, prefs: prefs, rank: 3))
+	}
+}
+
+struct WatchGetMyDirectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get My Direction"
+	static var description = IntentDescription("Gets the direction the watch is facing as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<WatchIntersectorShortcutResult> {
+		let prefs = WatchAppPrefs.saved()
+		let heading = try await WatchLocationProvider().currentHeading(allowCached: false)
+		let direction = WatchGeo.localizedDirection(heading, prefs: prefs)
+		return .result(
+			value: WatchIntersectorShortcutResult(
+				announcementText: "Facing \(direction).",
+				direction: direction,
+				heading: WatchGeo.compassDirection(heading)
+			)
+		)
 	}
 }
 

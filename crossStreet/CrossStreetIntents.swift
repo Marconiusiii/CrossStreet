@@ -9,17 +9,123 @@ import AppIntents
 import CoreLocation
 import Foundation
 
-/// Returns the spoken announcement as a plain dialog only. Siri speaks it and
-/// shows its own native dialog bubble — one correctly-formatted copy of the
-/// text. Earlier attempts paired the dialog with a custom snippet view, which
-/// rendered the text a second time (larger, left-justified, no margins) and
-/// forced a snippet card that appeared as an empty bubble while `perform()` was
-/// still fetching. Returning `ProvidesDialog` alone matches the native system
-/// behavior and avoids both problems.
 private func intersectorResult(
 	_ text: String
 ) -> some IntentResult & ProvidesDialog {
 	.result(dialog: IntentDialog(stringLiteral: text))
+}
+
+struct IntersectorShortcutResult: AppEntity {
+	typealias ID = String
+
+	static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Intersector Result")
+	static var defaultQuery = IntersectorShortcutResultQuery()
+
+	var id: String
+
+	@Property(title: "Announcement Text")
+	var announcementText: String
+
+	@Property(title: "Intersection")
+	var intersection: String
+
+	@Property(title: "Distance")
+	var distance: String
+
+	@Property(title: "Direction")
+	var direction: String
+
+	@Property(title: "Heading")
+	var heading: String
+
+	@Property(title: "Neighborhood")
+	var neighborhood: String
+
+	@Property(title: "Toward")
+	var toward: String
+
+	@Property(title: "Details")
+	var details: String
+
+	@Property(title: "Confidence")
+	var confidence: String
+
+	var displayRepresentation: DisplayRepresentation {
+		DisplayRepresentation(title: "\(announcementText)")
+	}
+
+	init(
+		id: String = UUID().uuidString,
+		announcementText: String,
+		intersection: String = "",
+		distance: String = "",
+		direction: String = "",
+		heading: String = "",
+		neighborhood: String = "",
+		toward: String = "",
+		details: String = "",
+		confidence: String = ""
+	) {
+		self.id = id
+		self.announcementText = announcementText
+		self.intersection = intersection
+		self.distance = distance
+		self.direction = direction
+		self.heading = heading
+		self.neighborhood = neighborhood
+		self.toward = toward
+		self.details = details
+		self.confidence = confidence
+	}
+}
+
+struct IntersectorShortcutResultQuery: EntityQuery {
+	func entities(for identifiers: [IntersectorShortcutResult.ID]) async throws -> [IntersectorShortcutResult] {
+		[]
+	}
+
+	func suggestedEntities() async throws -> [IntersectorShortcutResult] {
+		[]
+	}
+}
+
+private func shortcutResult(from report: OrientReport, prefs: AppPrefs, rank: Int? = nil) -> IntersectorShortcutResult {
+	let announcementText = if let rank {
+		report.text(with: prefs, rank: rank)
+	} else {
+		report.text(with: prefs)
+	}
+	return IntersectorShortcutResult(
+		announcementText: announcementText,
+		intersection: report.cross,
+		distance: report.dist,
+		direction: report.relDir ?? "",
+		heading: report.head ?? "",
+		neighborhood: report.area ?? "",
+		toward: report.toward ?? "",
+		details: report.intersectionDetails?.spokenPhrases.joined(separator: ", ") ?? "",
+		confidence: confidenceText(report.conf)
+	)
+}
+
+private func confidenceText(_ confidence: ConfLev) -> String {
+	switch confidence {
+	case .high:
+		"High"
+	case .medium:
+		"Medium"
+	case .low:
+		"Low"
+	}
+}
+
+private func getIntersectionResult(
+	_ kind: ReportKind,
+	rank: Int = 1
+) async throws -> IntersectorShortcutResult {
+	let prefs = AppPrefs.saved()
+	let report = try await OrientSvc.shared.report(kind, rank: rank, prefs: prefs)
+	return shortcutResult(from: report, prefs: prefs, rank: rank == 1 ? nil : rank)
 }
 
 struct NearestIntersectionIntent: AppIntent {
@@ -128,6 +234,93 @@ struct ThirdUpcomingIntersectionIntent: AppIntent {
 	}
 }
 
+struct GetNearestIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get Nearest Intersection"
+	static var description = IntentDescription("Gets the closest mapped intersection as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		.result(value: try await getIntersectionResult(.nearest))
+	}
+}
+
+struct GetSecondNearestIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 2nd Nearest Intersection"
+	static var description = IntentDescription("Gets the second closest mapped intersection as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		.result(value: try await getIntersectionResult(.nearest, rank: 2))
+	}
+}
+
+struct GetThirdNearestIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 3rd Nearest Intersection"
+	static var description = IntentDescription("Gets the third closest mapped intersection as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		.result(value: try await getIntersectionResult(.nearest, rank: 3))
+	}
+}
+
+struct GetUpcomingIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get Upcoming Intersection"
+	static var description = IntentDescription("Gets the mapped intersection ahead as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		.result(value: try await getIntersectionResult(.upcoming))
+	}
+}
+
+struct GetSecondUpcomingIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 2nd Upcoming Intersection"
+	static var description = IntentDescription("Gets the second mapped intersection ahead as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		.result(value: try await getIntersectionResult(.upcoming, rank: 2))
+	}
+}
+
+struct GetThirdUpcomingIntersectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get 3rd Upcoming Intersection"
+	static var description = IntentDescription("Gets the third mapped intersection ahead as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		.result(value: try await getIntersectionResult(.upcoming, rank: 3))
+	}
+}
+
+struct GetMyDirectionIntent: AppIntent {
+	static var title: LocalizedStringResource = "Get My Direction"
+	static var description = IntentDescription("Gets the direction the device is facing as a Shortcuts value.")
+	static var openAppWhenRun = false
+
+	@MainActor
+	func perform() async throws -> some IntentResult & ReturnsValue<IntersectorShortcutResult> {
+		let prefs = AppPrefs.saved()
+		let provider = LocationProvider()
+		let heading = try await provider.currentHeading(allowCached: false)
+		let direction = Geo.localizedDirection(heading, prefs: prefs)
+		return .result(
+			value: IntersectorShortcutResult(
+				announcementText: "Facing \(direction).",
+				direction: direction,
+				heading: Geo.compassDirection(heading)
+			)
+		)
+	}
+}
+
 struct MyDirectionIntent: AppIntent {
 	static var title: LocalizedStringResource = "My Direction"
 	static var description = IntentDescription("Reports the cardinal direction the device is facing.")
@@ -156,13 +349,13 @@ enum LaunchKeys {
 }
 
 struct StartPointScanIntent: AppIntent {
-	static var title: LocalizedStringResource = "Start Point and Scan"
-	static var description = IntentDescription("Opens Intersector and starts live Point and Scan mode.")
+	static var title: LocalizedStringResource = "Start Scan Mode"
+	static var description = IntentDescription("Opens Intersector and starts Scan Mode.")
 	static var openAppWhenRun = true
 
 	func perform() async throws -> some IntentResult & ProvidesDialog {
 		UserDefaults.standard.set(true, forKey: await LaunchKeys.startPointScan)
-		return .result(dialog: "Opening Intersector with Point and Scan.")
+		return .result(dialog: "Opening Intersector in Scan Mode.")
 	}
 }
 
@@ -269,10 +462,10 @@ struct IntersectorShortcuts: AppShortcutsProvider {
 		AppShortcut(
 			intent: StartPointScanIntent(),
 			phrases: [
-				"Start Point and Scan in \(.applicationName)",
+				"Start Scan Mode in \(.applicationName)",
 				"Scan for intersections with \(.applicationName)"
 			],
-			shortTitle: "Point Scan",
+			shortTitle: "Scan Mode",
 			systemImageName: "dot.radiowaves.left.and.right"
 		)
 	}

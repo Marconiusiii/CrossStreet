@@ -21,7 +21,7 @@ struct OnboardingView: View {
 		),
 		OnboardingPage(
 			title: "Use Siri Shortcuts",
-			body: "Try saying: Nearest intersection in Intersector. Upcoming intersection in Intersector. Start Point and Scan in Intersector. You can also set up your own shortcuts using Intersector in the Shortcuts app."
+			body: "Try saying: Nearest intersection in Intersector. Upcoming intersection in Intersector. Start Scan Mode in Intersector. You can also set up your own shortcuts using Intersector in the Shortcuts app."
 		),
 		OnboardingPage(
 			title: "Apple Watch Support",

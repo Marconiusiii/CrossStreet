@@ -15,4 +15,11 @@ enum VoiceOverAnnouncer {
 		announcement.accessibilitySpeechAnnouncementPriority = .high
 		AccessibilityNotification.Announcement(announcement).post()
 	}
+
+	@MainActor
+	static func statusUpdated(_ text: String) {
+		var announcement = AttributedString(text)
+		announcement.accessibilitySpeechAnnouncementPriority = .low
+		AccessibilityNotification.Announcement(announcement).post()
+	}
 }
