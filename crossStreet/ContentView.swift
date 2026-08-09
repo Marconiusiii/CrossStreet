@@ -497,6 +497,9 @@ struct ContentView: View {
 	@ScaledMetric(relativeTo: .body) private var statusMinHeight: CGFloat = 112
 	@ScaledMetric(relativeTo: .title2) private var actionMinHeight: CGFloat = 76
 	@State private var statusText = "Choose an action."
+	@State private var statusPresentationID = 0
+	@State private var isStatusEmphasized = false
+	@State private var statusEmphasisTask: Task<Void, Never>?
 	@State private var isLoading = false
 	@State private var isDirectionLoading = false
 	@State private var isStartupLoading = false
@@ -714,27 +717,32 @@ struct ContentView: View {
 	}
 
 	private var statusView: some View {
-		Group {
-			if usesCenteredStatusLayout {
-				VStack(alignment: .center, spacing: 0) {
-					currentInfoHeading(alignment: .center, isCentered: true)
-					currentInfoBody(alignment: .center, textAlignment: .center)
-				}
-			} else {
-				HStack(alignment: .top, spacing: 0) {
-					currentInfoHeading(alignment: .leading, isCentered: false)
-						.layoutPriority(1)
-					currentInfoBody(alignment: .leading, textAlignment: .leading)
-						.layoutPriority(2)
+		VStack(spacing: 0) {
+			Group {
+				if usesCenteredStatusLayout {
+					VStack(alignment: .center, spacing: 0) {
+						currentInfoHeading(alignment: .center, isCentered: true)
+						currentInfoBody(alignment: .center, textAlignment: .center)
+					}
+				} else {
+					HStack(alignment: .top, spacing: 0) {
+						currentInfoHeading(alignment: .leading, isCentered: false)
+							.layoutPriority(1)
+						currentInfoBody(alignment: .leading, textAlignment: .leading)
+							.layoutPriority(2)
+					}
 				}
 			}
+			loadingProgressBar
 		}
 		.frame(maxWidth: .infinity, minHeight: statusMinHeight, alignment: usesCenteredStatusLayout ? .center : .topLeading)
 		.background(Color.crossPanel)
-		.overlay(alignment: .topTrailing) {
-			loadingStatusOverlay
-				.padding(.top, 10)
-				.padding(.trailing, 10)
+		.overlay {
+			Rectangle()
+				.strokeBorder(Color.crossAccent, lineWidth: 3)
+				.opacity(isStatusEmphasized ? 1 : 0)
+				.allowsHitTesting(false)
+				.accessibilityHidden(true)
 		}
 		.contentShape(Rectangle())
 	}
@@ -764,6 +772,7 @@ struct ContentView: View {
 		textAlignment: TextAlignment
 	) -> some View {
 		Text(statusText)
+			.id(statusPresentationID)
 			.font(.body)
 			.foregroundStyle(Color.crossInv)
 			.multilineTextAlignment(textAlignment)
@@ -774,6 +783,8 @@ struct ContentView: View {
 			.padding(.vertical, 10)
 			.frame(maxWidth: .infinity, minHeight: 60, alignment: alignment)
 			.contentShape(Rectangle())
+			.transition(statusTextTransition)
+			.animation(.easeInOut(duration: 0.24), value: statusPresentationID)
 	}
 
 	private func currentInfoBody(
@@ -783,43 +794,51 @@ struct ContentView: View {
 		currentInfoText(alignment: alignment, textAlignment: textAlignment)
 	}
 
-	@ViewBuilder
-	private var loadingStatusOverlay: some View {
-		let isVisible = isStartupLoading || isMapPreparationLoading || isLookupProgressVisible
-		HStack(spacing: 8) {
-			statusActivityIndicator
-			if isLookupProgressVisible {
-				Text(lookupLoadingText)
-					.font(.caption)
-					.fontWeight(.semibold)
-					.foregroundStyle(Color.crossAccent)
-			}
+	private var statusTextTransition: AnyTransition {
+		if accessibilityReduceMotion {
+			return .opacity
 		}
-		.padding(.horizontal, 10)
-		.padding(.vertical, 6)
-		.background(Color.crossBg.opacity(0.94), in: Capsule())
-		.overlay(Capsule().stroke(Color.crossAccent.opacity(0.72), lineWidth: 1))
-		.shadow(color: Color.black.opacity(0.22), radius: 3, x: 0, y: 1)
-		.opacity(isVisible ? 1 : 0)
-		.animation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.2), value: isVisible)
-		.accessibilityHidden(true)
+		return .asymmetric(
+			insertion: .opacity.combined(with: .offset(y: 4)),
+			removal: .opacity
+		)
 	}
 
 	@ViewBuilder
-	private var statusActivityIndicator: some View {
-		Group {
-			if accessibilityReduceMotion {
-				Image(systemName: "hourglass")
-					.imageScale(.small)
-					.foregroundStyle(Color.crossAccent)
-			} else {
+	private var loadingProgressBar: some View {
+		ZStack {
+			if isStatusLoading {
 				ProgressView()
+					.progressViewStyle(.linear)
 					.tint(Color.crossAccent)
-					.controlSize(.regular)
+					.accessibilityLabel(loadingAccessibilityLabel)
+					.accessibilityValue("In progress")
+			} else {
+				Color.clear
+					.accessibilityHidden(true)
 			}
 		}
-		.frame(width: 24, height: 24)
-		.accessibilityHidden(true)
+		.frame(maxWidth: .infinity)
+		.frame(height: 4)
+		.padding(.bottom, 6)
+		.animation(.easeInOut(duration: 0.2), value: isStatusLoading)
+	}
+
+	private var isStatusLoading: Bool {
+		isStartupLoading || isMapPreparationLoading || isLookupProgressVisible || pointScanner.isPreparing
+	}
+
+	private var loadingAccessibilityLabel: String {
+		if isLookupProgressVisible {
+			return lookupLoadingText
+		}
+		if pointScanner.isPreparing {
+			return "Scan Mode Loading..."
+		}
+		if isMapPreparationLoading {
+			return mapPreparationText
+		}
+		return startupLoadingText
 	}
 
 	private var nearestButton: some View {
@@ -871,7 +890,7 @@ struct ContentView: View {
 	private var pointScanToggle: some View {
 		Button {
 			pointScanner.setScanning(!(pointScanner.isScanning || pointScanner.isPreparing), prefs: prefs) { text in
-				statusText = text
+				handleScanModeStatus(text)
 			}
 		} label: {
 			actionLabel("Scan", systemImage: "dot.radiowaves.left.and.right")
@@ -1648,6 +1667,36 @@ struct ContentView: View {
 		.padding(12)
 	}
 
+	private func presentStatusText(_ text: String) {
+		guard text != statusText else {
+			return
+		}
+
+		statusText = text
+		statusPresentationID += 1
+		statusEmphasisTask?.cancel()
+		withAnimation(.easeIn(duration: 0.16)) {
+			isStatusEmphasized = true
+		}
+		statusEmphasisTask = Task { @MainActor in
+			do {
+				try await Task.sleep(for: .milliseconds(1_250))
+			} catch {
+				return
+			}
+			withAnimation(.easeOut(duration: 0.35)) {
+				isStatusEmphasized = false
+			}
+		}
+	}
+
+	private func handleScanModeStatus(_ text: String) {
+		guard text != "Scan Mode Loading..." else {
+			return
+		}
+		presentStatusText(text)
+	}
+
 	private func updateReport(_ kind: ReportKind, rank: Int = 1) async {
 		guard !isLoading else {
 			return
@@ -1658,6 +1707,7 @@ struct ContentView: View {
 		if showsProgressImmediately {
 			isLookupProgressVisible = true
 			LoadingThrobber.start(hapticsEnabled: prefs.haptics)
+			VoiceOverAnnouncer.reportUpdated(lookupLoadingText)
 		}
 		let loadingTask = Task { @MainActor in
 			do {
@@ -1667,6 +1717,7 @@ struct ContentView: View {
 				}
 				isLookupProgressVisible = true
 				LoadingThrobber.start(hapticsEnabled: prefs.haptics)
+				VoiceOverAnnouncer.reportUpdated(lookupLoadingText)
 			} catch {}
 		}
 
@@ -1682,7 +1733,7 @@ struct ContentView: View {
 				isLookupProgressVisible = false
 				isMapPreparationLoading = false
 				isMapDataReady = true
-				statusText = text
+				presentStatusText(text)
 				VoiceOverAnnouncer.reportUpdated(text)
 				break
 			} catch {
@@ -1694,7 +1745,7 @@ struct ContentView: View {
 				LoadingThrobber.stop()
 				isLookupProgressVisible = false
 				let text = reportFailureText(kind, rank: rank, error: error)
-				statusText = text
+				presentStatusText(text)
 				VoiceOverAnnouncer.reportUpdated(text)
 				break
 			}
@@ -1711,7 +1762,6 @@ struct ContentView: View {
 		isMapDataReady = false
 		isMapPreparationLoading = true
 		isLookupProgressVisible = true
-		statusText = mapWaitingText
 		VoiceOverAnnouncer.reportUpdated(mapWaitingText)
 
 		var hasPreparedMapData = await OrientSvc.shared.prewarmInitialReportMapData(prefs: prefs)
@@ -1780,11 +1830,11 @@ struct ContentView: View {
 		do {
 			let heading = try await directionLocationProvider.currentHeading(allowCached: false)
 			let text = "Facing \(Geo.localizedDirection(heading, prefs: prefs))."
-			statusText = text
+			presentStatusText(text)
 			VoiceOverAnnouncer.reportUpdated(text)
 		} catch {
 			let text = "Intersector is having trouble getting your direction. Please try again."
-			statusText = text
+			presentStatusText(text)
 			VoiceOverAnnouncer.reportUpdated(text)
 		}
 
@@ -1798,14 +1848,13 @@ struct ContentView: View {
 		hasPreparedInitialLocation = true
 		startupTask = Task {
 			isStartupLoading = true
-			statusText = startupLoadingText
 			VoiceOverAnnouncer.reportUpdated(startupLoadingText)
 			LoadingThrobber.start(hapticsEnabled: prefs.haptics)
 
 			var hasLocation = await OrientSvc.shared.prewarmLocation()
 			while !hasLocation, !Task.isCancelled {
 				let text = "Intersector could not get your location yet. Retrying automatically."
-				statusText = text
+				presentStatusText(text)
 				VoiceOverAnnouncer.reportUpdated(text)
 				try? await Task.sleep(for: .seconds(2))
 				guard !Task.isCancelled else {
@@ -1819,12 +1868,10 @@ struct ContentView: View {
 
 			isStartupLoading = false
 			isMapPreparationLoading = true
-			statusText = mapPreparationText
 
 			var hasPreparedMapData = await OrientSvc.shared.prewarmInitialReportMapData(prefs: prefs)
 			var announcedWaiting = false
 			while !hasPreparedMapData, !Task.isCancelled {
-				statusText = mapWaitingText
 				if !announcedWaiting {
 					VoiceOverAnnouncer.reportUpdated(mapWaitingText)
 					announcedWaiting = true
@@ -1843,7 +1890,7 @@ struct ContentView: View {
 			isMapPreparationLoading = false
 			isMapDataReady = true
 			ReadyEarcon.play(hapticsEnabled: prefs.haptics)
-			statusText = readyText
+			presentStatusText(readyText)
 			Task { @MainActor in
 				try? await Task.sleep(for: .milliseconds(1_350))
 				VoiceOverAnnouncer.reportUpdated(readyText)
@@ -1870,9 +1917,6 @@ struct ContentView: View {
 		}
 		LoadingThrobber.stop()
 		isStartupLoading = false
-		if statusText == startupLoadingText {
-			statusText = "Choose an action."
-		}
 	}
 
 	@discardableResult
@@ -1883,7 +1927,7 @@ struct ContentView: View {
 		UserDefaults.standard.set(false, forKey: LaunchKeys.startPointScan)
 		cancelStartupPreparationIfNeeded()
 		pointScanner.setScanning(true, prefs: prefs) { text in
-			statusText = text
+			handleScanModeStatus(text)
 		}
 		return true
 	}
