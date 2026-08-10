@@ -45,6 +45,15 @@ private enum DisplayLayout: String, CaseIterable, Identifiable {
 	}
 }
 
+private struct PersistentScanButtonStyle: ButtonStyle {
+	@Environment(\.isEnabled) private var isEnabled
+
+	func makeBody(configuration: Configuration) -> some View {
+		configuration.label
+			.opacity(configuration.isPressed && isEnabled ? 0.82 : 1)
+	}
+}
+
 private let lookupLoadingText = "Still finding the intersection."
 private let extendedLookupLoadingText = "Still working. Map data is taking longer than usual."
 private let startupLoadingText = "Loading Intersector."
@@ -955,7 +964,7 @@ struct ContentView: View {
 				.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
 				.contentShape(Rectangle())
 		}
-		.buttonStyle(.plain)
+		.buttonStyle(PersistentScanButtonStyle())
 		.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
 		.foregroundStyle(Color.crossButtonText)
 		.background(pointScanBackground)
