@@ -499,6 +499,13 @@ struct ContentView: View {
 	@ScaledMetric(relativeTo: .title2) private var actionMinHeight: CGFloat = 76
 	@State private var statusText = "Choose an action."
 	@State private var statusPresentationID = 0
+	@State private var isStatusEmphasized = false
+	@State private var hasMetMinimumStatusEmphasisDuration = true
+	@State private var hasCurrentStatusOperationCompleted = true
+	@State private var statusOperationID = 0
+	@State private var statusEmphasisTask: Task<Void, Never>?
+	@State private var isVisualLoadingIndicatorVisible = false
+	@State private var visualLoadingIndicatorTask: Task<Void, Never>?
 	@State private var isLoading = false
 	@State private var isDirectionLoading = false
 	@State private var isStartupLoading = false
@@ -512,6 +519,7 @@ struct ContentView: View {
 	@State private var onboardingLocationProvider = LocationProvider()
 	@State private var directionLocationProvider = LocationProvider()
 	@StateObject private var pointScanner = PointScanController()
+	@State private var scanPreparationStatusOperationID: Int?
 	@State private var watchSettingsSync = WatchSettingsSync()
 	@AccessibilityFocusState private var settingsFocusTarget: SettingsFocusTarget?
 	private let mainActionBorderWidth: CGFloat = 3
@@ -666,6 +674,7 @@ struct ContentView: View {
 			.onChange(of: scenePhase) { _, phase in
 				if phase != .active {
 					pointScanner.stopScanning()
+					finishScanPreparationPresentation()
 				}
 			}
 		}
@@ -731,14 +740,14 @@ struct ContentView: View {
 					}
 				}
 			}
-			loadingProgressBar
+			visualLoadingIndicator
 		}
 		.frame(maxWidth: .infinity, minHeight: statusMinHeight, alignment: usesCenteredStatusLayout ? .center : .topLeading)
 		.background(Color.crossPanel)
 		.overlay {
 			Rectangle()
 				.strokeBorder(Color.crossAccent, lineWidth: 3)
-				.opacity(isStatusLoading ? 1 : 0)
+				.opacity(isStatusEmphasized ? 1 : 0)
 				.allowsHitTesting(false)
 				.accessibilityHidden(true)
 		}
@@ -803,14 +812,14 @@ struct ContentView: View {
 	}
 
 	@ViewBuilder
-	private var loadingProgressBar: some View {
+	private var visualLoadingIndicator: some View {
 		ZStack {
-			if isStatusLoading {
+			if isVisualLoadingIndicatorVisible {
 				ProgressView()
-					.progressViewStyle(.linear)
+					.progressViewStyle(.circular)
 					.tint(Color.crossAccent)
 					.controlSize(.large)
-					.scaleEffect(x: 1, y: 2, anchor: .center)
+					.scaleEffect(1.25)
 					.accessibilityHidden(true)
 			} else {
 				Color.clear
@@ -818,14 +827,78 @@ struct ContentView: View {
 			}
 		}
 		.frame(maxWidth: .infinity)
-		.frame(height: 8)
-		.padding(.horizontal, 16)
-		.padding(.vertical, 8)
-		.animation(.easeInOut(duration: 0.2), value: isStatusLoading)
+		.frame(height: 32)
+		.animation(.easeInOut(duration: 0.2), value: isVisualLoadingIndicatorVisible)
 	}
 
-	private var isStatusLoading: Bool {
-		isLoading || isDirectionLoading || isStartupLoading || isMapPreparationLoading || pointScanner.isPreparing
+	@discardableResult
+	private func beginLoadingPresentation() -> Int {
+		statusOperationID += 1
+		let operationID = statusOperationID
+		statusEmphasisTask?.cancel()
+		visualLoadingIndicatorTask?.cancel()
+		hasMetMinimumStatusEmphasisDuration = false
+		hasCurrentStatusOperationCompleted = false
+		isVisualLoadingIndicatorVisible = false
+		withAnimation(.easeIn(duration: 0.2)) {
+			isStatusEmphasized = true
+		}
+
+		statusEmphasisTask = Task { @MainActor in
+			do {
+				try await Task.sleep(for: .milliseconds(1_250))
+			} catch {
+				return
+			}
+			guard operationID == statusOperationID else {
+				return
+			}
+			hasMetMinimumStatusEmphasisDuration = true
+			guard hasCurrentStatusOperationCompleted else {
+				return
+			}
+			fadeOutStatusEmphasis()
+		}
+		visualLoadingIndicatorTask = Task { @MainActor in
+			do {
+				try await Task.sleep(for: .seconds(2))
+			} catch {
+				return
+			}
+			guard
+				operationID == statusOperationID,
+				!hasCurrentStatusOperationCompleted
+			else {
+				return
+			}
+			withAnimation(.easeIn(duration: 0.2)) {
+				isVisualLoadingIndicatorVisible = true
+			}
+		}
+		return operationID
+	}
+
+	private func finishLoadingPresentation(operationID: Int) {
+		guard operationID == statusOperationID else {
+			return
+		}
+		hasCurrentStatusOperationCompleted = true
+		visualLoadingIndicatorTask?.cancel()
+		visualLoadingIndicatorTask = nil
+		withAnimation(.easeOut(duration: 0.2)) {
+			isVisualLoadingIndicatorVisible = false
+		}
+		guard hasMetMinimumStatusEmphasisDuration else {
+			return
+		}
+		fadeOutStatusEmphasis()
+	}
+
+	private func fadeOutStatusEmphasis() {
+		withAnimation(.easeOut(duration: 0.35)) {
+			isStatusEmphasized = false
+		}
+		statusEmphasisTask = nil
 	}
 
 	private var nearestButton: some View {
@@ -876,9 +949,7 @@ struct ContentView: View {
 
 	private var pointScanToggle: some View {
 		Button {
-			pointScanner.setScanning(!(pointScanner.isScanning || pointScanner.isPreparing), prefs: prefs) { text in
-				handleScanModeStatus(text)
-			}
+			toggleScanMode()
 		} label: {
 			actionLabel("Scan", systemImage: "dot.radiowaves.left.and.right")
 				.frame(maxWidth: .infinity, minHeight: actionMinHeight, alignment: .center)
@@ -1673,7 +1744,34 @@ struct ContentView: View {
 		guard text != "Scan Mode Loading..." else {
 			return
 		}
+		finishScanPreparationPresentation()
 		presentStatusText(text)
+	}
+
+	private func toggleScanMode() {
+		let isStopping = pointScanner.isScanning || pointScanner.isPreparing
+		let operationID = beginLoadingPresentation()
+		if isStopping {
+			scanPreparationStatusOperationID = nil
+			pointScanner.setScanning(false, prefs: prefs) { text in
+				handleScanModeStatus(text)
+			}
+			finishLoadingPresentation(operationID: operationID)
+			return
+		}
+
+		scanPreparationStatusOperationID = operationID
+		pointScanner.setScanning(true, prefs: prefs) { text in
+			handleScanModeStatus(text)
+		}
+	}
+
+	private func finishScanPreparationPresentation() {
+		guard let operationID = scanPreparationStatusOperationID else {
+			return
+		}
+		scanPreparationStatusOperationID = nil
+		finishLoadingPresentation(operationID: operationID)
 	}
 
 	private func updateReport(_ kind: ReportKind, rank: Int = 1) async {
@@ -1681,7 +1779,12 @@ struct ContentView: View {
 			return
 		}
 		cancelStartupPreparationIfNeeded()
+		let operationID = beginLoadingPresentation()
 		isLoading = true
+		defer {
+			isLoading = false
+			finishLoadingPresentation(operationID: operationID)
+		}
 		let loadingTask = Task { @MainActor in
 			do {
 				try await Task.sleep(for: .seconds(2))
@@ -1723,7 +1826,6 @@ struct ContentView: View {
 			}
 		}
 
-		isLoading = false
 	}
 
 	private func isMapLoadingError(_ error: Error) -> Bool {
@@ -1796,7 +1898,12 @@ struct ContentView: View {
 		guard !isDirectionLoading else {
 			return
 		}
+		let operationID = beginLoadingPresentation()
 		isDirectionLoading = true
+		defer {
+			isDirectionLoading = false
+			finishLoadingPresentation(operationID: operationID)
+		}
 
 		do {
 			let heading = try await directionLocationProvider.currentHeading(allowCached: false)
@@ -1809,7 +1916,6 @@ struct ContentView: View {
 			VoiceOverAnnouncer.reportUpdated(text)
 		}
 
-		isDirectionLoading = false
 	}
 
 	private func prepareInitialLocationIfNeeded() {
@@ -1817,7 +1923,11 @@ struct ContentView: View {
 			return
 		}
 		hasPreparedInitialLocation = true
+		let operationID = beginLoadingPresentation()
 		startupTask = Task {
+			defer {
+				finishLoadingPresentation(operationID: operationID)
+			}
 			isStartupLoading = true
 			VoiceOverAnnouncer.reportUpdated(startupLoadingText)
 			LoadingThrobber.start(hapticsEnabled: prefs.haptics)
@@ -1897,6 +2007,8 @@ struct ContentView: View {
 		}
 		UserDefaults.standard.set(false, forKey: LaunchKeys.startPointScan)
 		cancelStartupPreparationIfNeeded()
+		let operationID = beginLoadingPresentation()
+		scanPreparationStatusOperationID = operationID
 		pointScanner.setScanning(true, prefs: prefs) { text in
 			handleScanModeStatus(text)
 		}
