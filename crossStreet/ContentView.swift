@@ -690,9 +690,20 @@ struct ContentView: View {
 	}
 
 	private var headerView: some View {
-		HStack(alignment: .center, spacing: 0) {
-			appTitle
-			settingsButton
+		ViewThatFits(in: .horizontal) {
+			HStack(alignment: .center, spacing: 0) {
+				appTitle
+					.fixedSize(horizontal: true, vertical: false)
+				Spacer(minLength: 0)
+				settingsButton
+					.fixedSize(horizontal: true, vertical: false)
+			}
+			VStack(alignment: .leading, spacing: 0) {
+				appTitle
+					.frame(maxWidth: .infinity, alignment: .leading)
+				settingsButton
+					.frame(maxWidth: .infinity, alignment: .trailing)
+			}
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
 		.background(Color.crossBg)
@@ -709,7 +720,7 @@ struct ContentView: View {
 			.padding(.leading, 16)
 			.padding(.trailing, 8)
 			.padding(.vertical, 6)
-			.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+			.frame(minHeight: 56, alignment: .leading)
 			.contentShape(Rectangle())
 			.accessibilityAddTraits(.isHeader)
 	}
@@ -721,8 +732,9 @@ struct ContentView: View {
 			Text("Settings")
 				.font(.body)
 				.fontWeight(.semibold)
-				.lineLimit(1)
-				.minimumScaleFactor(0.75)
+				.multilineTextAlignment(.center)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
 				.padding(.horizontal, 14)
 				.padding(.vertical, 6)
 				.frame(minWidth: 96, minHeight: 56, alignment: .center)
@@ -1262,37 +1274,56 @@ struct ContentView: View {
 	}
 
 	private var settingsTitleRow: some View {
-		HStack(alignment: .center, spacing: 12) {
-			Text("Settings")
-				.font(.largeTitle)
-				.fontWeight(.bold)
-				.foregroundStyle(Color.crossText)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-				.frame(maxWidth: .infinity, alignment: .leading)
-				.accessibilityAddTraits(.isHeader)
-			Button {
-				isShowingHelp = true
-			} label: {
-				Text("Help")
-					.font(.body)
-					.fontWeight(.semibold)
-					.foregroundStyle(Color.crossAccent)
-					.lineLimit(1)
-					.minimumScaleFactor(0.75)
-					.padding(.horizontal, 14)
-					.padding(.vertical, 6)
-					.frame(minWidth: 72, minHeight: 52, alignment: .center)
-					.contentShape(Rectangle())
+		ViewThatFits(in: .horizontal) {
+			HStack(alignment: .center, spacing: 12) {
+				settingsTitle
+					.fixedSize(horizontal: true, vertical: false)
+				Spacer(minLength: 0)
+				helpButton
+					.fixedSize(horizontal: true, vertical: false)
 			}
-			.buttonStyle(.plain)
-			.accessibilityHint("Opens instructions for using Intersector.")
+			VStack(alignment: .leading, spacing: 0) {
+				settingsTitle
+					.frame(maxWidth: .infinity, alignment: .leading)
+				helpButton
+					.frame(maxWidth: .infinity, alignment: .trailing)
+			}
 		}
 		.padding(.horizontal, 16)
 		.padding(.vertical, 8)
 		.frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
 		.background(Color.crossSettingsHeader)
 		.contentShape(Rectangle())
+	}
+
+	private var settingsTitle: some View {
+		Text("Settings")
+			.font(.largeTitle)
+			.fontWeight(.bold)
+			.foregroundStyle(Color.crossText)
+			.lineLimit(nil)
+			.fixedSize(horizontal: false, vertical: true)
+			.accessibilityAddTraits(.isHeader)
+	}
+
+	private var helpButton: some View {
+		Button {
+			isShowingHelp = true
+		} label: {
+			Text("Help")
+				.font(.body)
+				.fontWeight(.semibold)
+				.foregroundStyle(Color.crossAccent)
+				.multilineTextAlignment(.center)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
+				.padding(.horizontal, 14)
+				.padding(.vertical, 6)
+				.frame(minWidth: 72, minHeight: 52, alignment: .center)
+				.contentShape(Rectangle())
+		}
+		.buttonStyle(.plain)
+		.accessibilityHint("Opens instructions for using Intersector.")
 	}
 
 	private var settingsDisplaySection: some View {
@@ -1304,7 +1335,10 @@ struct ContentView: View {
 						Text(layout.label).tag(layout)
 					}
 				}
-				.pickerStyle(.segmented)
+				.pickerStyle(.menu)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
+				.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 				.accessibilityFocused($settingsFocusTarget, equals: .displayLayout)
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
@@ -1330,7 +1364,10 @@ struct ContentView: View {
 							Text(item.label).tag(item)
 						}
 					}
-					.pickerStyle(.segmented)
+					.pickerStyle(.menu)
+					.lineLimit(nil)
+					.fixedSize(horizontal: false, vertical: true)
+					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 					.accessibilityFocused($settingsFocusTarget, equals: .measurementUnit)
 				}
 			}
@@ -1345,7 +1382,10 @@ struct ContentView: View {
 							Text(item.label).tag(item)
 						}
 					}
-					.pickerStyle(.segmented)
+					.pickerStyle(.menu)
+					.lineLimit(nil)
+					.fixedSize(horizontal: false, vertical: true)
+					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 					.accessibilityFocused($settingsFocusTarget, equals: .direction)
 				}
 			}
@@ -1360,7 +1400,10 @@ struct ContentView: View {
 							Text(mode.label).tag(mode)
 						}
 					}
-					.pickerStyle(.segmented)
+					.pickerStyle(.menu)
+					.lineLimit(nil)
+					.fixedSize(horizontal: false, vertical: true)
+					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 					.accessibilityFocused($settingsFocusTarget, equals: .neighborhood)
 				}
 			}
@@ -1417,18 +1460,16 @@ struct ContentView: View {
 	}
 
 	private var spokenIntersectionsControl: some View {
-		VStack(alignment: .leading, spacing: 8) {
-			Text("Spoken Intersections")
-				.foregroundStyle(Color.crossText)
-			Picker("Spoken Intersections", selection: spokenIntersectionCountBinding) {
-				ForEach(SpokenIntersectionCount.allCases) { count in
-					Text("\(count.rawValue)")
-						.accessibilityLabel(spokenIntersectionOptionAccessibilityLabel(count))
-						.tag(count)
-				}
+		Picker("Spoken Intersections", selection: spokenIntersectionCountBinding) {
+			ForEach(SpokenIntersectionCount.allCases) { count in
+				Text(spokenIntersectionOptionAccessibilityLabel(count))
+					.tag(count)
 			}
-			.pickerStyle(.segmented)
 		}
+		.pickerStyle(.menu)
+		.lineLimit(nil)
+		.fixedSize(horizontal: false, vertical: true)
+		.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
 		.accessibilityFocused($settingsFocusTarget, equals: .spokenIntersections)
 	}
 
@@ -1734,8 +1775,8 @@ struct ContentView: View {
 		Label {
 			Text(title)
 				.multilineTextAlignment(.center)
-				.lineLimit(1)
-				.minimumScaleFactor(0.72)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
 		} icon: {
 			Image(systemName: systemImage)
 		}

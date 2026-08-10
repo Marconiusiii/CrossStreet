@@ -115,13 +115,15 @@ The main screen has these parts:
 5. Direction button
 6. Scan toggle
 
-The visible button labels are intentionally short so they hold up better with larger text sizes. Their accessibility labels still use the fuller action names, such as `Nearest Intersection`, `Upcoming Intersection`, `My Direction`, and `Scan Mode`.
+The visible button labels are intentionally short and can wrap instead of shrinking below the user's selected Dynamic Type size. Their accessibility labels still use the fuller action names, such as `Nearest Intersection`, `Upcoming Intersection`, `My Direction`, and `Scan Mode`.
 
 Nearest and Upcoming can also show subtle chevron menu controls beside them. These menus give sighted and low-vision touch users access to 2nd and 3rd ranked results without adding four more full-width buttons. The menus are hidden from VoiceOver because the Nearest and Upcoming buttons already expose those same ranked choices as custom accessibility actions.
 
 Scan Mode uses a stronger border because it starts and stops a live mode. When it is preparing or scanning, its background changes from yellow to orange so the active state is visible without relying only on the other buttons becoming disabled.
 
 The main screen uses a vertical `ScrollView` for all text sizes.
+
+The title header uses `ViewThatFits`. Intersector and Settings remain side by side while their full-size text fits. When a narrow display, Display Zoom, or larger text leaves insufficient width, Settings moves below the title. The Settings and Help header uses the same fit-based fallback. This does not change the Current Info layout. Current Info follows the user's Default or Centered setting at standard text sizes and only automatically stacks at the Accessibility Dynamic Type sizes.
 
 Each major row has a scaled minimum height. The minimum height gives the row enough tappable space at normal text sizes, while still allowing the row to grow when Dynamic Type is larger.
 
@@ -800,9 +802,7 @@ struct AppPrefs {
 }
 ```
 
-`AreaMode`, `MeasurementUnit`, `DirectionStyle`, `IntersectionWording`, and `SpokenIntersectionCount` are enums. Each enum provides a value or label for the native Settings controls. `AnnouncementOptions` stores the Distance, Direction, and Neighborhood toggles. Manhattan Snob Mode is a Boolean because it is just on or off.
-
-Intersection wording uses a segmented control. Direct wording names both roads as an intersection. Street Context first names the road nearest the device, then identifies the other road. For example: `Upcoming: On E 20th Avenue, Main Street is about 140 feet ahead.` A short description below the control changes with the selection. If the nearest road cannot be matched confidently to the selected intersection, the report uses Direct wording instead.
+`AreaMode`, `MeasurementUnit`, `DirectionStyle`, `IntersectionWording`, and `SpokenIntersectionCount` are enums. Each enum provides a value or label for the native Settings controls. `AnnouncementOptions` stores the Distance, Direction, and Neighborhood toggles. Manhattan Snob Mode is a Boolean because it is just on or off. Intersection wording remains internally fixed to direct intersection names.
 
 Map detail controls whether extra OpenStreetMap details are included in the lookup. Crossings can add mapped crossing points on a named road. Walking Paths can include named paths such as footways when they intersect with streets or other named paths.
 
@@ -810,19 +810,19 @@ Walking Paths remains off by default. When enabled, first Upcoming as well as ra
 
 Announcement content uses three toggles: Distance, Direction, and Neighborhood. The intersection name is always included. Turning all three toggles off gives compact intersection-name-only output. When several results share the same street, compact output names that street in the first intersection and then lists the remaining cross streets, such as `Amsterdam Avenue and West 93rd Street, West 94th Street`. When the results do not share a street, each intersection remains complete, such as `Foothill Boulevard and Frazier Avenue, Stanley Avenue and Talbot Avenue`.
 
-The Announcements section progressively reveals dependent controls. When Distance is on, Measurement Unit appears so the user can choose feet or meters. When Direction is on, Direction Style appears as a segmented control with Relative, Cardinal, and Clock Face choices. Relative describes the intersection from the phone heading, such as `ahead and right`. Cardinal uses the geographic bearing from the user to the intersection, such as `northwest`. Clock Face uses wording such as `at 2 o'clock` and treats the direction the phone is pointing as 12 o'clock. The saved raw value `words` continues to select Relative so existing preferences remain compatible. Manhattan Snob Mode changes Cardinal and My Direction wording into New York-style wording. North and northeast become `Uptown`, east and southeast become `East Side`, south and southwest become `Downtown`, and west and northwest become `West Side`. A Cardinal intersection report can therefore say `about 120 feet toward Uptown`, while Relative and Clock Face reports remain unchanged. Neighborhood is disabled on a fresh installation. When it is enabled, Neighborhood Context appears as a segmented control with Nearby only and Nearby and toward choices. A sample string below the toggles updates as these settings change.
+The Announcements section progressively reveals dependent controls. Current Info Layout, Measurement Unit, Direction Style, Neighborhood Context, and Spoken Intersections are native menu-style pickers rather than segmented controls, so their choices are not divided into narrow fixed-width segments at larger text sizes. When Distance is on, Measurement Unit appears so the user can choose feet or meters. When Direction is on, Direction Style offers Relative, Cardinal, and Clock Face. Relative describes the intersection from the phone heading, such as `ahead and right`. Cardinal uses the geographic bearing from the user to the intersection, such as `northwest`. Clock Face uses wording such as `at 2 o'clock` and treats the direction the phone is pointing as 12 o'clock. The saved raw value `words` continues to select Relative so existing preferences remain compatible. Manhattan Snob Mode changes Cardinal and My Direction wording into New York-style wording. North and northeast become `Uptown`, east and southeast become `East Side`, south and southwest become `Downtown`, and west and northwest become `West Side`. A Cardinal intersection report can therefore say `about 120 feet toward Uptown`, while Relative and Clock Face reports remain unchanged. Neighborhood is disabled on a fresh installation. When it is enabled, Neighborhood Context offers Nearby only and Nearby and toward. A sample string below the toggles updates as these settings change.
 
-Spoken Intersections is a menu picker with values 1, 2, and 3. The selected number controls how many results the app requests. Nearest orders multiple results by straight-line distance. Upcoming uses the phone heading to choose a travel direction and orders intersections along the connected path of the current road. VoiceOver receives the complete labels `One intersection`, `Two intersections`, and `Three intersections`. The explanatory text for values 2 and 3 states exactly how many results Nearest and Upcoming will speak.
+Spoken Intersections is a menu picker with the visible and spoken choices `1 intersection`, `2 intersections`, and `3 intersections`. The selected number controls how many results the app requests. Nearest orders multiple results by straight-line distance. Upcoming uses the phone heading to choose a travel direction and orders intersections along the connected path of the current road. The explanatory text for values 2 and 3 states exactly how many results Nearest and Upcoming will speak.
 
 The `Show 2nd and 3rd Controls` toggle controls whether the main screen shows chevron menus for ranked Nearest and Upcoming results. Turning it off removes those visible menus, but Siri, Shortcuts, and VoiceOver custom actions still provide ranked access.
 
-Settings groups use native `Section` headers. The Announcements section comes first and acts as the main builder for spoken output. More specialized sections, such as Intersection Wording, Spoken Intersections, Map Detail, and About Intersector, follow it.
+Settings uses a vertical `ScrollView` with expanding native controls and visible section headers. The Announcements section acts as the main builder for spoken output, followed by more specialized groups such as Regional Wording, Map Data, Interaction, and About Intersector.
 
 This keeps display strings near the setting values they describe.
 
-The Settings view also uses `@AccessibilityFocusState` for its setting controls. When a user changes a setting, the binding saves the new value and marks that same control as the accessibility focus target. That helps VoiceOver stay on the control that changed instead of jumping to the sheet's Done button after SwiftUI redraws the form.
+The Settings view also uses `@AccessibilityFocusState` for its setting controls. When a user changes a picker selection, the binding saves the new value and marks that same native picker as the accessibility focus target. Native menu dismissal returns to its triggering picker when the user closes it without changing a value. Together, the native menu behavior and stable picker identity keep VoiceOver from jumping to an unrelated control when options close.
 
-The feedback button, privacy policy, acknowledgements, and app information are grouped in a native Form section headed `About Intersector`.
+The feedback button, privacy policy, acknowledgements, and app information are grouped under `About Intersector`.
 
 The Acknowledgements disclosure begins by thanking Jen Walz for inspiring the creation of Intersector, followed by the OpenStreetMap attribution and license link.
 
@@ -837,6 +837,8 @@ The onboarding pages are shown with a `NavigationStack`.
 ```
 
 The page content is stored in an array of `OnboardingPage` values.
+
+Each page places its heading and instructions in a native vertical `ScrollView`. The Next button remains in a separate bottom action area, so larger text, Display Zoom, and shorter screens can scroll the instructions without pushing the action offscreen. The source order remains heading, instructions, then Next for VoiceOver.
 
 When the user presses Next, the app pushes the next onboarding page onto the navigation path. That makes each onboarding step a real incoming screen instead of rewriting the title and body inside the same view. This structure gives VoiceOver a better native screen transition to work with when moving from one page heading to the next.
 

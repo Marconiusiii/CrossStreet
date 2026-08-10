@@ -76,19 +76,24 @@ private struct OnboardingPageView: View {
 	var onNext: () -> Void
 
 	var body: some View {
-		VStack(alignment: .leading, spacing: 24) {
-			Spacer(minLength: 0)
-			Text(page.title)
-				.font(.largeTitle)
-				.fontWeight(.bold)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-				.accessibilityAddTraits(.isHeader)
-			Text(page.body)
-				.font(.title3)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-			Spacer(minLength: 0)
+		VStack(spacing: 0) {
+			ScrollView {
+				VStack(alignment: .leading, spacing: 24) {
+					Text(page.title)
+						.font(.largeTitle)
+						.fontWeight(.bold)
+						.lineLimit(nil)
+						.fixedSize(horizontal: false, vertical: true)
+						.accessibilityAddTraits(.isHeader)
+					Text(page.body)
+						.font(.title3)
+						.lineLimit(nil)
+						.fixedSize(horizontal: false, vertical: true)
+				}
+				.frame(maxWidth: .infinity, alignment: .leading)
+				.padding(24)
+			}
+
 			Button {
 				onNext()
 			} label: {
@@ -104,8 +109,11 @@ private struct OnboardingPageView: View {
 			}
 			.buttonStyle(.borderedProminent)
 			.disabled(isRequestingPermission)
+			.padding(.horizontal, 24)
+			.padding(.top, 12)
+			.padding(.bottom, 24)
+			.background(Color.crossBg)
 		}
-		.padding(24)
 		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 		.background(Color.crossBg)
 	}
