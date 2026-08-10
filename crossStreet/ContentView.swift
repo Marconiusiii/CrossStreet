@@ -749,10 +749,14 @@ struct ContentView: View {
 					}
 				}
 			}
-			visualLoadingIndicator
 		}
+		.padding(.bottom, 56)
 		.frame(maxWidth: .infinity, minHeight: statusMinHeight, alignment: usesCenteredStatusLayout ? .center : .topLeading)
 		.background(Color.crossPanel)
+		.overlay(alignment: .bottom) {
+			visualLoadingIndicator
+				.padding(.bottom, 8)
+		}
 		.overlay {
 			Rectangle()
 				.strokeBorder(Color.crossAccent, lineWidth: 3)
@@ -836,7 +840,7 @@ struct ContentView: View {
 			}
 		}
 		.frame(maxWidth: .infinity)
-		.frame(height: 32)
+		.frame(height: 48)
 		.animation(.easeInOut(duration: 0.2), value: isVisualLoadingIndicatorVisible)
 	}
 
@@ -1544,7 +1548,7 @@ struct ContentView: View {
 
 					helpSection(
 						title: "Siri and Shortcuts",
-						body: "Intersector includes shortcut actions for Nearest Intersection, Upcoming Intersection, My Direction, and Point. In the Shortcuts app, you can create your own phrase, such as Which way am I facing, and Siri can run that shortcut without needing you to say with Intersector."
+						body: "Intersector includes shortcut actions for Nearest Intersection, Upcoming Intersection, My Direction, and Scan Mode. In the Shortcuts app, you can create your own phrase, such as Which way am I facing, and Siri can run that shortcut without needing you to say with Intersector."
 					)
 
 					helpSection(
@@ -1753,7 +1757,11 @@ struct ContentView: View {
 		guard text != "Scan Mode Loading..." else {
 			return
 		}
-		finishScanPreparationPresentation()
+		let completedPreparation = finishScanPreparationPresentation()
+		if !completedPreparation, pointScanner.isScanning {
+			let operationID = beginLoadingPresentation()
+			finishLoadingPresentation(operationID: operationID)
+		}
 		presentStatusText(text)
 	}
 
@@ -1775,12 +1783,14 @@ struct ContentView: View {
 		}
 	}
 
-	private func finishScanPreparationPresentation() {
+	@discardableResult
+	private func finishScanPreparationPresentation() -> Bool {
 		guard let operationID = scanPreparationStatusOperationID else {
-			return
+			return false
 		}
 		scanPreparationStatusOperationID = nil
 		finishLoadingPresentation(operationID: operationID)
+		return true
 	}
 
 	private func updateReport(_ kind: ReportKind, rank: Int = 1) async {
