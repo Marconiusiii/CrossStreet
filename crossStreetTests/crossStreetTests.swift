@@ -311,6 +311,84 @@ struct IntersectorTests {
 		#expect(report.text(with: prefs, rank: 2) == "2nd Upcoming: Amsterdam Avenue and West 94th Street.")
 	}
 
+	@Test func multipleNameOnlyReportsKeepNearestPrefix() async throws {
+		var prefs = AppPrefs()
+		prefs.announcementOptions = AnnouncementOptions(
+			includeDistance: false,
+			includeDirection: false,
+			includeNeighborhood: false
+		)
+		let reports = IntersectionReportList(reports: [
+			OrientReport(
+				kind: .nearest,
+				cross: "Main Street and First Street",
+				dist: "100 feet",
+				relDir: "ahead",
+				relDegrees: 0,
+				street: "Main Street",
+				crossStreet: "First Street",
+				head: "north",
+				area: nil,
+				toward: nil,
+				conf: .high
+			),
+			OrientReport(
+				kind: .nearest,
+				cross: "Main Street and Second Street",
+				dist: "200 feet",
+				relDir: "behind",
+				relDegrees: 180,
+				street: "Main Street",
+				crossStreet: "Second Street",
+				head: "south",
+				area: nil,
+				toward: nil,
+				conf: .high
+			)
+		])
+
+		#expect(reports.text(with: prefs) == "Nearest: Main Street and First Street, Second Street.")
+	}
+
+	@Test func multipleNameOnlyReportsKeepUpcomingPrefix() async throws {
+		var prefs = AppPrefs()
+		prefs.announcementOptions = AnnouncementOptions(
+			includeDistance: false,
+			includeDirection: false,
+			includeNeighborhood: false
+		)
+		let reports = IntersectionReportList(reports: [
+			OrientReport(
+				kind: .upcoming,
+				cross: "Oak Avenue and Third Street",
+				dist: "100 feet",
+				relDir: "ahead",
+				relDegrees: 0,
+				street: "Oak Avenue",
+				crossStreet: "Third Street",
+				head: "north",
+				area: nil,
+				toward: nil,
+				conf: .high
+			),
+			OrientReport(
+				kind: .upcoming,
+				cross: "Oak Avenue and Fourth Street",
+				dist: "200 feet",
+				relDir: "ahead",
+				relDegrees: 0,
+				street: "Oak Avenue",
+				crossStreet: "Fourth Street",
+				head: "north",
+				area: nil,
+				toward: nil,
+				conf: .high
+			)
+		])
+
+		#expect(reports.text(with: prefs) == "Upcoming: Oak Avenue and Third Street, Fourth Street.")
+	}
+
 	@Test func streetContextNamesCurrentStreetBeforeCrossStreet() async throws {
 		var prefs = AppPrefs()
 		prefs.areaMode = .off

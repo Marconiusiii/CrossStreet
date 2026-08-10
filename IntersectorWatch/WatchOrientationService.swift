@@ -820,9 +820,7 @@ struct WatchOrientationReport: Equatable {
 		} else {
 			text = directText(with: prefs)
 		}
-		let shouldIncludeLead = includeLead &&
-			(!prefs.announcementOptions.speaksIntersectionNamesOnly || rank != nil)
-		if shouldIncludeLead {
+		if includeLead {
 			text = "\(leadText(rank: rank)): \(text)"
 		}
 		if includeNeighborhood, let area = areaText(prefs) {
@@ -961,7 +959,7 @@ struct WatchIntersectionReportList: Equatable {
 			} else {
 				labels = reports.map(\.cross)
 			}
-			return labels.joined(separator: ", ") + "."
+			return "\(first.kind.leadText): \(labels.joined(separator: ", "))."
 		}
 
 		let sharedNeighborhood = sharedNeighborhoodText(with: prefs)

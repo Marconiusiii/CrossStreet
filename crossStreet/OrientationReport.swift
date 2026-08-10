@@ -106,7 +106,7 @@ struct OrientReport: Equatable {
 		return baseLeadText
 	}
 
-	private var baseLeadText: String {
+	fileprivate var baseLeadText: String {
 		switch kind {
 		case .nearest:
 			"Nearest"
@@ -236,7 +236,7 @@ struct IntersectionReportList: Equatable {
 			} else {
 				labels = reports.map(\.cross)
 			}
-			return labels.joined(separator: ", ") + "."
+			return "\(first.baseLeadText): \(labels.joined(separator: ", "))."
 		}
 
 		let sharedNeighborhood = sharedNeighborhoodText(with: prefs)

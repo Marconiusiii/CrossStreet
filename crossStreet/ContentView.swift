@@ -1050,7 +1050,6 @@ struct ContentView: View {
 			selectedAreaMode
 		} set: { areaMode in
 			areaModeRaw = areaMode.rawValue
-			settingsFocusTarget = .neighborhood
 		}
 	}
 
@@ -1059,7 +1058,6 @@ struct ContentView: View {
 			prefs.measurementUnit
 		} set: { measurementUnit in
 			measurementUnitRaw = measurementUnit.rawValue
-			settingsFocusTarget = .measurementUnit
 		}
 	}
 
@@ -1068,7 +1066,6 @@ struct ContentView: View {
 			prefs.directionStyle
 		} set: { directionStyle in
 			directionStyleRaw = directionStyle.rawValue
-			settingsFocusTarget = .direction
 		}
 	}
 
@@ -1159,7 +1156,6 @@ struct ContentView: View {
 			displayLayout
 		} set: { layout in
 			displayLayoutRaw = layout.rawValue
-			settingsFocusTarget = .displayLayout
 		}
 	}
 
@@ -1168,7 +1164,6 @@ struct ContentView: View {
 			prefs.spokenIntersectionCount
 		} set: { count in
 			spokenIntersectionCountRaw = count.rawValue
-			settingsFocusTarget = .spokenIntersections
 		}
 	}
 
@@ -1335,11 +1330,10 @@ struct ContentView: View {
 						Text(layout.label).tag(layout)
 					}
 				}
-				.pickerStyle(.menu)
+				.pickerStyle(.navigationLink)
 				.lineLimit(nil)
 				.fixedSize(horizontal: false, vertical: true)
 				.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-				.accessibilityFocused($settingsFocusTarget, equals: .displayLayout)
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
 			settingsControlRow {
@@ -1364,11 +1358,10 @@ struct ContentView: View {
 							Text(item.label).tag(item)
 						}
 					}
-					.pickerStyle(.menu)
+					.pickerStyle(.navigationLink)
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-					.accessibilityFocused($settingsFocusTarget, equals: .measurementUnit)
 				}
 			}
 			settingsControlRow {
@@ -1382,11 +1375,10 @@ struct ContentView: View {
 							Text(item.label).tag(item)
 						}
 					}
-					.pickerStyle(.menu)
+					.pickerStyle(.navigationLink)
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-					.accessibilityFocused($settingsFocusTarget, equals: .direction)
 				}
 			}
 			settingsControlRow {
@@ -1400,11 +1392,10 @@ struct ContentView: View {
 							Text(mode.label).tag(mode)
 						}
 					}
-					.pickerStyle(.menu)
+					.pickerStyle(.navigationLink)
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-					.accessibilityFocused($settingsFocusTarget, equals: .neighborhood)
 				}
 			}
 			settingsControlRow {
@@ -1466,11 +1457,10 @@ struct ContentView: View {
 					.tag(count)
 			}
 		}
-		.pickerStyle(.menu)
+		.pickerStyle(.navigationLink)
 		.lineLimit(nil)
 		.fixedSize(horizontal: false, vertical: true)
 		.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-		.accessibilityFocused($settingsFocusTarget, equals: .spokenIntersections)
 	}
 
 	private var settingsMapDetailSection: some View {
