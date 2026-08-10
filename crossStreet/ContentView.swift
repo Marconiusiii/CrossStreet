@@ -29,6 +29,52 @@ private enum SettingsFocusTarget: Hashable {
 	case haptics
 }
 
+private typealias SettingsAccessibilityFocusBinding = AccessibilityFocusState<SettingsFocusTarget?>.Binding
+
+private struct SettingsFocusRestorer {
+	let action: (SettingsFocusTarget) -> Void
+
+	func callAsFunction(_ target: SettingsFocusTarget) {
+		action(target)
+	}
+}
+
+private struct SettingsView<Content: View>: View {
+	@AccessibilityFocusState private var focusedElement: SettingsFocusTarget?
+	private let content: (
+		SettingsAccessibilityFocusBinding,
+		SettingsFocusRestorer
+	) -> Content
+
+	init(
+		@ViewBuilder content: @escaping (
+			SettingsAccessibilityFocusBinding,
+			SettingsFocusRestorer
+		) -> Content
+	) {
+		self.content = content
+	}
+
+	var body: some View {
+		content(
+			$focusedElement,
+			SettingsFocusRestorer(action: restoreFocus)
+		)
+	}
+
+	private func restoreFocus(to target: SettingsFocusTarget) {
+		focusedElement = nil
+
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+			focusedElement = target
+		}
+
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+			focusedElement = target
+		}
+	}
+}
+
 private enum DisplayLayout: String, CaseIterable, Identifiable {
 	case standard
 	case centered
@@ -530,7 +576,6 @@ struct ContentView: View {
 	@StateObject private var pointScanner = PointScanController()
 	@State private var scanPreparationStatusOperationID: Int?
 	@State private var watchSettingsSync = WatchSettingsSync()
-	@AccessibilityFocusState private var settingsFocusTarget: SettingsFocusTarget?
 	private let mainActionBorderWidth: CGFloat = 3
 	private let scanActionBorderWidth: CGFloat = 9
 
@@ -1074,7 +1119,6 @@ struct ContentView: View {
 			includeAnnouncementDistance
 		} set: { isEnabled in
 			includeAnnouncementDistance = isEnabled
-			settingsFocusTarget = .announcementDistance
 		}
 	}
 
@@ -1083,7 +1127,6 @@ struct ContentView: View {
 			includeAnnouncementDirection
 		} set: { isEnabled in
 			includeAnnouncementDirection = isEnabled
-			settingsFocusTarget = .announcementDirection
 		}
 	}
 
@@ -1095,7 +1138,6 @@ struct ContentView: View {
 				areaModeRaw = AreaMode.near.rawValue
 			}
 			includeAnnouncementNeighborhood = isEnabled
-			settingsFocusTarget = .announcementNeighborhood
 		}
 	}
 
@@ -1104,7 +1146,6 @@ struct ContentView: View {
 			includeIntersectionDetails
 		} set: { isEnabled in
 			includeIntersectionDetails = isEnabled
-			settingsFocusTarget = .intersectionDetails
 		}
 	}
 
@@ -1147,7 +1188,6 @@ struct ContentView: View {
 			showRankedControls
 		} set: { isEnabled in
 			showRankedControls = isEnabled
-			settingsFocusTarget = .rankedControls
 		}
 	}
 
@@ -1183,7 +1223,6 @@ struct ContentView: View {
 			hapticsEnabled
 		} set: { isEnabled in
 			hapticsEnabled = isEnabled
-			settingsFocusTarget = .haptics
 		}
 	}
 
@@ -1192,7 +1231,6 @@ struct ContentView: View {
 			manhattanSnobMode
 		} set: { isEnabled in
 			manhattanSnobMode = isEnabled
-			settingsFocusTarget = .manhattanSnobMode
 		}
 	}
 
@@ -1201,7 +1239,6 @@ struct ContentView: View {
 			includeCrossings
 		} set: { isEnabled in
 			includeCrossings = isEnabled
-			settingsFocusTarget = .crossings
 		}
 	}
 
@@ -1210,52 +1247,56 @@ struct ContentView: View {
 			includeWalkingPaths
 		} set: { isEnabled in
 			includeWalkingPaths = isEnabled
-			settingsFocusTarget = .walkingPaths
 		}
 	}
 
 	private var settingsView: some View {
-		NavigationStack {
-			GeometryReader { geometry in
-				ScrollView {
-					settingsContent
-						.frame(maxWidth: .infinity)
-						.frame(minHeight: geometry.size.height, alignment: .top)
-				}
-			}
-			.background(Color.crossBg)
-			.tint(Color.crossAccent)
-			.navigationTitle("")
-			.navigationBarTitleDisplayMode(.inline)
-			.toolbar {
-				ToolbarItem(placement: .confirmationAction) {
-					Button("Done") {
-						isShowingSettings = false
+		SettingsView { focus, restoreFocus in
+			NavigationStack {
+				GeometryReader { geometry in
+					ScrollView {
+						settingsContent(focus: focus, restoreFocus: restoreFocus)
+							.frame(maxWidth: .infinity)
+							.frame(minHeight: geometry.size.height, alignment: .top)
 					}
 				}
-			}
-			.sheet(isPresented: $isShowingMailComposer) {
-				MailComposerView(
-					recipient: "marco@marconius.com",
-					subject: "Intersector Feedback",
-					body: feedbackEmailBody,
-					onFinish: { _ in }
-				)
-			}
-			.sheet(isPresented: $isShowingHelp) {
-				helpView
+				.background(Color.crossBg)
+				.tint(Color.crossAccent)
+				.navigationTitle("")
+				.navigationBarTitleDisplayMode(.inline)
+				.toolbar {
+					ToolbarItem(placement: .confirmationAction) {
+						Button("Done") {
+							isShowingSettings = false
+						}
+					}
+				}
+				.sheet(isPresented: $isShowingMailComposer) {
+					MailComposerView(
+						recipient: "marco@marconius.com",
+						subject: "Intersector Feedback",
+						body: feedbackEmailBody,
+						onFinish: { _ in }
+					)
+				}
+				.sheet(isPresented: $isShowingHelp) {
+					helpView
+				}
 			}
 		}
 	}
 
-	private var settingsContent: some View {
+	private func settingsContent(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		VStack(alignment: .leading, spacing: 0) {
 			settingsIntroSection
-			settingsDisplaySection
-			settingsAnnouncementSection
-			settingsRegionalWordingSection
-			settingsMapDetailSection
-			settingsInteractionSection
+			settingsDisplaySection(focus: focus, restoreFocus: restoreFocus)
+			settingsAnnouncementSection(focus: focus, restoreFocus: restoreFocus)
+			settingsRegionalWordingSection(focus: focus, restoreFocus: restoreFocus)
+			settingsMapDetailSection(focus: focus, restoreFocus: restoreFocus)
+			settingsInteractionSection(focus: focus, restoreFocus: restoreFocus)
 			settingsAboutSection
 		}
 		.frame(maxHeight: .infinity)
@@ -1321,7 +1362,10 @@ struct ContentView: View {
 		.accessibilityHint("Opens instructions for using Intersector.")
 	}
 
-	private var settingsDisplaySection: some View {
+	private func settingsDisplaySection(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		Group {
 			settingsHeader("Display")
 			settingsControlRow {
@@ -1334,22 +1378,35 @@ struct ContentView: View {
 				.lineLimit(nil)
 				.fixedSize(horizontal: false, vertical: true)
 				.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+				.accessibilityFocused(focus, equals: .displayLayout)
+				.onChange(of: displayLayoutRaw) { _, _ in
+					restoreFocus(.displayLayout)
+				}
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
 			settingsControlRow {
 				Toggle("Show 2nd and 3rd Controls", isOn: rankedControlsBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .rankedControls)
+					.accessibilityFocused(focus, equals: .rankedControls)
 					.accessibilityHint("Toggles the visibility of the menu chevrons")
+					.onChange(of: showRankedControls) { _, _ in
+						restoreFocus(.rankedControls)
+					}
 			}
 		}
 	}
 
-	private var settingsAnnouncementSection: some View {
+	private func settingsAnnouncementSection(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		Group {
 			settingsHeader("Spoken Announcements")
 			settingsControlRow {
 				Toggle("Distance", isOn: announcementDistanceBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .announcementDistance)
+					.accessibilityFocused(focus, equals: .announcementDistance)
+					.onChange(of: includeAnnouncementDistance) { _, _ in
+						restoreFocus(.announcementDistance)
+					}
 			}
 			if includeAnnouncementDistance {
 				settingsControlRow {
@@ -1362,11 +1419,18 @@ struct ContentView: View {
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+					.accessibilityFocused(focus, equals: .measurementUnit)
+					.onChange(of: measurementUnitRaw) { _, _ in
+						restoreFocus(.measurementUnit)
+					}
 				}
 			}
 			settingsControlRow {
 				Toggle("Direction", isOn: announcementDirectionBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .announcementDirection)
+					.accessibilityFocused(focus, equals: .announcementDirection)
+					.onChange(of: includeAnnouncementDirection) { _, _ in
+						restoreFocus(.announcementDirection)
+					}
 			}
 			if includeAnnouncementDirection {
 				settingsControlRow {
@@ -1379,11 +1443,18 @@ struct ContentView: View {
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+					.accessibilityFocused(focus, equals: .direction)
+					.onChange(of: directionStyleRaw) { _, _ in
+						restoreFocus(.direction)
+					}
 				}
 			}
 			settingsControlRow {
 				Toggle("Neighborhood", isOn: announcementNeighborhoodBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .announcementNeighborhood)
+					.accessibilityFocused(focus, equals: .announcementNeighborhood)
+					.onChange(of: includeAnnouncementNeighborhood) { _, _ in
+						restoreFocus(.announcementNeighborhood)
+					}
 			}
 			if includeAnnouncementNeighborhood {
 				settingsControlRow {
@@ -1396,15 +1467,22 @@ struct ContentView: View {
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+					.accessibilityFocused(focus, equals: .neighborhood)
+					.onChange(of: areaModeRaw) { _, _ in
+						restoreFocus(.neighborhood)
+					}
 				}
 			}
 			settingsControlRow {
 				Toggle("Intersection Details", isOn: intersectionDetailsBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .intersectionDetails)
+					.accessibilityFocused(focus, equals: .intersectionDetails)
+					.onChange(of: includeIntersectionDetails) { _, _ in
+						restoreFocus(.intersectionDetails)
+					}
 			}
 			settingsHelperText("Adds mapped details such as traffic signals and pedestrian islands when that information is available.")
 			settingsControlRow {
-				spokenIntersectionsControl
+				spokenIntersectionsControl(focus: focus, restoreFocus: restoreFocus)
 			}
 			settingsHelperText(spokenIntersectionCountDescription)
 			sampleAnnouncementSection
@@ -1439,18 +1517,27 @@ struct ContentView: View {
 		.background(Color.crossSettingsHelper)
 	}
 
-	private var settingsRegionalWordingSection: some View {
+	private func settingsRegionalWordingSection(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		Group {
 			settingsHeader("Regional Wording")
 			settingsControlRow {
 				Toggle("Manhattan Snob Mode", isOn: manhattanSnobModeBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .manhattanSnobMode)
+					.accessibilityFocused(focus, equals: .manhattanSnobMode)
+					.onChange(of: manhattanSnobMode) { _, _ in
+						restoreFocus(.manhattanSnobMode)
+					}
 			}
 			settingsHelperText("Uses Uptown, Downtown, East Side, and West Side when cardinal directions are spoken.")
 		}
 	}
 
-	private var spokenIntersectionsControl: some View {
+	private func spokenIntersectionsControl(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		Picker("Spoken Intersections", selection: spokenIntersectionCountBinding) {
 			ForEach(SpokenIntersectionCount.allCases) { count in
 				Text(spokenIntersectionOptionAccessibilityLabel(count))
@@ -1461,29 +1548,48 @@ struct ContentView: View {
 		.lineLimit(nil)
 		.fixedSize(horizontal: false, vertical: true)
 		.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+		.accessibilityFocused(focus, equals: .spokenIntersections)
+		.onChange(of: spokenIntersectionCountRaw) { _, _ in
+			restoreFocus(.spokenIntersections)
+		}
 	}
 
-	private var settingsMapDetailSection: some View {
+	private func settingsMapDetailSection(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		Group {
 			settingsHeader("Map Data")
 			settingsControlRow {
 				Toggle("Include crossings", isOn: crossingsBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .crossings)
+					.accessibilityFocused(focus, equals: .crossings)
+					.onChange(of: includeCrossings) { _, _ in
+						restoreFocus(.crossings)
+					}
 			}
 			settingsControlRow {
 				Toggle("Include walking paths", isOn: walkingPathsBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .walkingPaths)
+					.accessibilityFocused(focus, equals: .walkingPaths)
+					.onChange(of: includeWalkingPaths) { _, _ in
+						restoreFocus(.walkingPaths)
+					}
 			}
 			settingsHelperText("Includes named mapped paths in Upcoming and other intersection results. Unnamed paths cannot provide a named intersection. Keep this off to focus results on the street grid.")
 		}
 	}
 
-	private var settingsInteractionSection: some View {
+	private func settingsInteractionSection(
+		focus: SettingsAccessibilityFocusBinding,
+		restoreFocus: SettingsFocusRestorer
+	) -> some View {
 		Group {
 			settingsHeader("Interaction")
 			settingsControlRow {
 				Toggle("Haptic scan feedback", isOn: hapticsBinding)
-					.accessibilityFocused($settingsFocusTarget, equals: .haptics)
+					.accessibilityFocused(focus, equals: .haptics)
+					.onChange(of: hapticsEnabled) { _, _ in
+						restoreFocus(.haptics)
+					}
 			}
 		}
 	}
@@ -1702,7 +1808,6 @@ struct ContentView: View {
 					.frame(height: 1)
 			}
 			.contentShape(Rectangle())
-			.accessibilityElement(children: .contain)
 	}
 
 	private func settingsButtonLabel(_ title: String) -> some View {
