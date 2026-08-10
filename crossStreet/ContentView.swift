@@ -760,6 +760,7 @@ struct ContentView: View {
 		.overlay {
 			Rectangle()
 				.strokeBorder(Color.crossAccent, lineWidth: 3)
+				.padding(.bottom, 2)
 				.opacity(isStatusEmphasized ? 1 : 0)
 				.allowsHitTesting(false)
 				.accessibilityHidden(true)
