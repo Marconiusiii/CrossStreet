@@ -499,14 +499,11 @@ struct ContentView: View {
 	@ScaledMetric(relativeTo: .title2) private var actionMinHeight: CGFloat = 76
 	@State private var statusText = "Choose an action."
 	@State private var statusPresentationID = 0
-	@State private var isStatusEmphasized = false
-	@State private var statusEmphasisTask: Task<Void, Never>?
 	@State private var isLoading = false
 	@State private var isDirectionLoading = false
 	@State private var isStartupLoading = false
 	@State private var isMapPreparationLoading = false
 	@State private var isMapDataReady = false
-	@State private var isLookupProgressVisible = false
 	@State private var isShowingSettings = false
 	@State private var isShowingHelp = false
 	@State private var isShowingMailComposer = false
@@ -741,7 +738,7 @@ struct ContentView: View {
 		.overlay {
 			Rectangle()
 				.strokeBorder(Color.crossAccent, lineWidth: 3)
-				.opacity(isStatusEmphasized ? 1 : 0)
+				.opacity(isStatusLoading ? 1 : 0)
 				.allowsHitTesting(false)
 				.accessibilityHidden(true)
 		}
@@ -812,6 +809,8 @@ struct ContentView: View {
 				ProgressView()
 					.progressViewStyle(.linear)
 					.tint(Color.crossAccent)
+					.controlSize(.large)
+					.scaleEffect(x: 1, y: 2, anchor: .center)
 					.accessibilityHidden(true)
 			} else {
 				Color.clear
@@ -819,13 +818,14 @@ struct ContentView: View {
 			}
 		}
 		.frame(maxWidth: .infinity)
-		.frame(height: 4)
-		.padding(.bottom, 6)
+		.frame(height: 8)
+		.padding(.horizontal, 16)
+		.padding(.vertical, 8)
 		.animation(.easeInOut(duration: 0.2), value: isStatusLoading)
 	}
 
 	private var isStatusLoading: Bool {
-		isStartupLoading || isMapPreparationLoading || isLookupProgressVisible || pointScanner.isPreparing
+		isLoading || isDirectionLoading || isStartupLoading || isMapPreparationLoading || pointScanner.isPreparing
 	}
 
 	private var nearestButton: some View {
@@ -904,14 +904,20 @@ struct ContentView: View {
 		primary: some View,
 		menu: some View
 	) -> some View {
-		ZStack(alignment: .trailing) {
+		let isVisuallyDimmed = pointScanner.isScanning || pointScanner.isPreparing
+		return ZStack(alignment: .trailing) {
 			primary
 				.frame(maxWidth: .infinity)
 			menu
 				.frame(width: 48, alignment: .center)
 		}
-		.background(Color.crossBtn)
-		.overlay(Rectangle().stroke(Color.crossButtonStrongBorder, lineWidth: mainActionBorderWidth))
+		.background(Color.crossBtn.opacity(isVisuallyDimmed ? 0.72 : 1))
+		.overlay(
+			Rectangle().stroke(
+				Color.crossButtonStrongBorder.opacity(isVisuallyDimmed ? 0.72 : 1),
+				lineWidth: mainActionBorderWidth
+			)
+		)
 		.shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
 		.contentShape(Rectangle())
 	}
@@ -1661,20 +1667,6 @@ struct ContentView: View {
 
 		statusText = text
 		statusPresentationID += 1
-		statusEmphasisTask?.cancel()
-		withAnimation(.easeIn(duration: 0.16)) {
-			isStatusEmphasized = true
-		}
-		statusEmphasisTask = Task { @MainActor in
-			do {
-				try await Task.sleep(for: .milliseconds(1_250))
-			} catch {
-				return
-			}
-			withAnimation(.easeOut(duration: 0.35)) {
-				isStatusEmphasized = false
-			}
-		}
 	}
 
 	private func handleScanModeStatus(_ text: String) {
@@ -1696,7 +1688,6 @@ struct ContentView: View {
 				guard !isMapPreparationLoading else {
 					return
 				}
-				isLookupProgressVisible = true
 				LoadingThrobber.start(hapticsEnabled: prefs.haptics)
 				VoiceOverAnnouncer.statusUpdated(lookupLoadingText)
 				try await Task.sleep(for: .seconds(8))
@@ -1713,7 +1704,6 @@ struct ContentView: View {
 				}
 				loadingTask.cancel()
 				LoadingThrobber.stop()
-				isLookupProgressVisible = false
 				isMapPreparationLoading = false
 				isMapDataReady = true
 				presentStatusText(text)
@@ -1726,7 +1716,6 @@ struct ContentView: View {
 				}
 				loadingTask.cancel()
 				LoadingThrobber.stop()
-				isLookupProgressVisible = false
 				let text = reportFailureText(kind, rank: rank, error: error)
 				presentStatusText(text)
 				VoiceOverAnnouncer.reportUpdated(text)
@@ -1744,7 +1733,6 @@ struct ContentView: View {
 	private func recoverMapDataForPendingReport() async {
 		isMapDataReady = false
 		isMapPreparationLoading = true
-		isLookupProgressVisible = true
 		VoiceOverAnnouncer.statusUpdated(mapWaitingText)
 
 		var hasPreparedMapData = await OrientSvc.shared.prewarmInitialReportMapData(prefs: prefs)

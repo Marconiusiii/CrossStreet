@@ -158,9 +158,9 @@ Important patterns:
 
 `ContentView` builds an `AppPrefs` value from the stored setting values when it needs to call the report service. That includes map detail settings, so the lookup code can tell whether crossings or walking paths should be included.
 
-`statusText` is the main piece of screen text for results and errors. The existing text stays visible while a new lookup runs. If the lookup lasts about two seconds, a native linear progress strip appears below Current Info without becoming a separate VoiceOver element. A low-priority VoiceOver status announcement says that Intersector is still finding the intersection. If the lookup continues for another eight seconds, a second low-priority status announcement explains that it is still working.
+`statusText` is the main piece of screen text for results and errors. The existing text stays visible while a new command runs. A native indeterminate linear progress strip appears immediately below Current Info and remains visible until the command completes without becoming a separate VoiceOver element. The gold outline around Current Info follows the same active-command state. If an intersection lookup lasts about two seconds, a low-priority VoiceOver status announcement says that Intersector is still finding the intersection. If the lookup continues for another eight seconds, a second low-priority status announcement explains that it is still working.
 
-When the result or error arrives, the progress strip disappears and the new text replaces the old text with a short fade. Without Reduce Motion, the incoming text also moves upward by four points. With Reduce Motion, the transition uses only the fade. A temporary outline emphasizes the changed Current Info region for low-vision users without flashing, and the completed result uses a high-priority VoiceOver announcement.
+When the result or error arrives, the progress strip and gold outline disappear and the new text replaces the old text with a short fade. Without Reduce Motion, the incoming text also moves upward by four points. With Reduce Motion, the transition uses only the fade. The completed result uses a high-priority VoiceOver announcement.
 
 ## What Happens When Nearest Intersection Is Pressed
 
@@ -174,11 +174,11 @@ await updateReport(.nearest)
 
 1. Checks `isLoading` so two reports do not run at the same time.
 2. Sets loading state.
-3. Starts a delayed loading task without replacing the existing Current Info text.
+3. Shows the progress strip and gold Current Info outline immediately without replacing the existing Current Info text.
 4. Calls `OrientSvc.shared.spokenText(kind, prefs: prefs)`.
-5. Shows the progress strip and sends low-priority status announcements only if the lookup takes long enough.
+5. Sends low-priority status announcements only if the lookup takes long enough.
 6. Cancels the delayed loading task when a result or error arrives.
-7. Replaces `statusText` using the fade and temporary low-vision emphasis.
+7. Replaces `statusText` using the fade as the active progress strip and outline disappear.
 8. Sends the completed result or error through `VoiceOverAnnouncer.reportUpdated(_:)`.
 9. Clears loading state and hides the progress strip.
 
