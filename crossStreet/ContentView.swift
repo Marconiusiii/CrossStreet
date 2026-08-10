@@ -1330,7 +1330,7 @@ struct ContentView: View {
 						Text(layout.label).tag(layout)
 					}
 				}
-				.pickerStyle(.navigationLink)
+				.pickerStyle(.menu)
 				.lineLimit(nil)
 				.fixedSize(horizontal: false, vertical: true)
 				.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1358,7 +1358,7 @@ struct ContentView: View {
 							Text(item.label).tag(item)
 						}
 					}
-					.pickerStyle(.navigationLink)
+					.pickerStyle(.menu)
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1375,7 +1375,7 @@ struct ContentView: View {
 							Text(item.label).tag(item)
 						}
 					}
-					.pickerStyle(.navigationLink)
+					.pickerStyle(.menu)
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1392,7 +1392,7 @@ struct ContentView: View {
 							Text(mode.label).tag(mode)
 						}
 					}
-					.pickerStyle(.navigationLink)
+					.pickerStyle(.menu)
 					.lineLimit(nil)
 					.fixedSize(horizontal: false, vertical: true)
 					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1457,7 +1457,7 @@ struct ContentView: View {
 					.tag(count)
 			}
 		}
-		.pickerStyle(.navigationLink)
+		.pickerStyle(.menu)
 		.lineLimit(nil)
 		.fixedSize(horizontal: false, vertical: true)
 		.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
