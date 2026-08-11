@@ -12,69 +12,6 @@ import SwiftUI
 import UIKit
 import WatchConnectivity
 
-private enum SettingsFocusTarget: Hashable {
-	case displayLayout
-	case neighborhood
-	case crossings
-	case walkingPaths
-	case measurementUnit
-	case direction
-	case announcementDistance
-	case announcementDirection
-	case announcementNeighborhood
-	case intersectionDetails
-	case spokenIntersections
-	case rankedControls
-	case manhattanSnobMode
-	case haptics
-}
-
-private typealias SettingsAccessibilityFocusBinding = AccessibilityFocusState<SettingsFocusTarget?>.Binding
-
-private struct SettingsFocusRestorer {
-	let action: (SettingsFocusTarget) -> Void
-
-	func callAsFunction(_ target: SettingsFocusTarget) {
-		action(target)
-	}
-}
-
-private struct SettingsView<Content: View>: View {
-	@AccessibilityFocusState private var focusedElement: SettingsFocusTarget?
-	private let content: (
-		SettingsAccessibilityFocusBinding,
-		SettingsFocusRestorer
-	) -> Content
-
-	init(
-		@ViewBuilder content: @escaping (
-			SettingsAccessibilityFocusBinding,
-			SettingsFocusRestorer
-		) -> Content
-	) {
-		self.content = content
-	}
-
-	var body: some View {
-		content(
-			$focusedElement,
-			SettingsFocusRestorer(action: restoreFocus)
-		)
-	}
-
-	private func restoreFocus(to target: SettingsFocusTarget) {
-		focusedElement = nil
-
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-			focusedElement = target
-		}
-
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-			focusedElement = target
-		}
-	}
-}
-
 private enum DisplayLayout: String, CaseIterable, Identifiable {
 	case standard
 	case centered
@@ -1251,52 +1188,47 @@ struct ContentView: View {
 	}
 
 	private var settingsView: some View {
-		SettingsView { focus, restoreFocus in
-			NavigationStack {
-				GeometryReader { geometry in
-					ScrollView {
-						settingsContent(focus: focus, restoreFocus: restoreFocus)
-							.frame(maxWidth: .infinity)
-							.frame(minHeight: geometry.size.height, alignment: .top)
+		NavigationStack {
+			GeometryReader { geometry in
+				ScrollView {
+					settingsContent
+						.frame(maxWidth: .infinity)
+						.frame(minHeight: geometry.size.height, alignment: .top)
+				}
+			}
+			.background(Color.crossBg)
+			.tint(Color.crossAccent)
+			.navigationTitle("")
+			.navigationBarTitleDisplayMode(.inline)
+			.toolbar {
+				ToolbarItem(placement: .confirmationAction) {
+					Button("Done") {
+						isShowingSettings = false
 					}
 				}
-				.background(Color.crossBg)
-				.tint(Color.crossAccent)
-				.navigationTitle("")
-				.navigationBarTitleDisplayMode(.inline)
-				.toolbar {
-					ToolbarItem(placement: .confirmationAction) {
-						Button("Done") {
-							isShowingSettings = false
-						}
-					}
-				}
-				.sheet(isPresented: $isShowingMailComposer) {
-					MailComposerView(
-						recipient: "marco@marconius.com",
-						subject: "Intersector Feedback",
-						body: feedbackEmailBody,
-						onFinish: { _ in }
-					)
-				}
-				.sheet(isPresented: $isShowingHelp) {
-					helpView
-				}
+			}
+			.sheet(isPresented: $isShowingMailComposer) {
+				MailComposerView(
+					recipient: "marco@marconius.com",
+					subject: "Intersector Feedback",
+					body: feedbackEmailBody,
+					onFinish: { _ in }
+				)
+			}
+			.sheet(isPresented: $isShowingHelp) {
+				helpView
 			}
 		}
 	}
 
-	private func settingsContent(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
+	private var settingsContent: some View {
 		VStack(alignment: .leading, spacing: 0) {
 			settingsIntroSection
-			settingsDisplaySection(focus: focus, restoreFocus: restoreFocus)
-			settingsAnnouncementSection(focus: focus, restoreFocus: restoreFocus)
-			settingsRegionalWordingSection(focus: focus, restoreFocus: restoreFocus)
-			settingsMapDetailSection(focus: focus, restoreFocus: restoreFocus)
-			settingsInteractionSection(focus: focus, restoreFocus: restoreFocus)
+			settingsDisplaySection
+			settingsAnnouncementSection
+			settingsRegionalWordingSection
+			settingsMapDetailSection
+			settingsInteractionSection
 			settingsAboutSection
 		}
 		.frame(maxHeight: .infinity)
@@ -1362,127 +1294,89 @@ struct ContentView: View {
 		.accessibilityHint("Opens instructions for using Intersector.")
 	}
 
-	private func settingsDisplaySection(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
+	private var settingsDisplaySection: some View {
 		Group {
 			settingsHeader("Display")
 			settingsControlRow {
-				Picker("Current Info Layout", selection: displayLayoutBinding) {
-					ForEach(DisplayLayout.allCases) { layout in
-						Text(layout.label).tag(layout)
+				VStack(alignment: .leading, spacing: 8) {
+					settingsSegmentedControlLabel("Current Info Layout")
+					Picker("Current Info Layout", selection: displayLayoutBinding) {
+						ForEach(DisplayLayout.allCases) { layout in
+							Text(layout.label).tag(layout)
+						}
 					}
-				}
-				.pickerStyle(.menu)
-				.lineLimit(nil)
-				.fixedSize(horizontal: false, vertical: true)
-				.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-				.accessibilityFocused(focus, equals: .displayLayout)
-				.onChange(of: displayLayoutRaw) { _, _ in
-					restoreFocus(.displayLayout)
+					.pickerStyle(.segmented)
 				}
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
 			settingsControlRow {
 				Toggle("Show 2nd and 3rd Controls", isOn: rankedControlsBinding)
-					.accessibilityFocused(focus, equals: .rankedControls)
 					.accessibilityHint("Toggles the visibility of the menu chevrons")
-					.onChange(of: showRankedControls) { _, _ in
-						restoreFocus(.rankedControls)
-					}
 			}
 		}
 	}
 
-	private func settingsAnnouncementSection(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
+	private var settingsAnnouncementSection: some View {
 		Group {
 			settingsHeader("Spoken Announcements")
 			settingsControlRow {
 				Toggle("Distance", isOn: announcementDistanceBinding)
-					.accessibilityFocused(focus, equals: .announcementDistance)
-					.onChange(of: includeAnnouncementDistance) { _, _ in
-						restoreFocus(.announcementDistance)
-					}
 			}
 			if includeAnnouncementDistance {
 				settingsControlRow {
-					Picker("Measurement Unit", selection: measurementUnitBinding) {
-						ForEach(MeasurementUnit.allCases) { item in
-							Text(item.label).tag(item)
+					VStack(alignment: .leading, spacing: 8) {
+						settingsSegmentedControlLabel("Measurement Unit")
+						Picker("Measurement Unit", selection: measurementUnitBinding) {
+							ForEach(MeasurementUnit.allCases) { item in
+								Text(item.label).tag(item)
+							}
 						}
-					}
-					.pickerStyle(.menu)
-					.lineLimit(nil)
-					.fixedSize(horizontal: false, vertical: true)
-					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-					.accessibilityFocused(focus, equals: .measurementUnit)
-					.onChange(of: measurementUnitRaw) { _, _ in
-						restoreFocus(.measurementUnit)
+						.pickerStyle(.segmented)
 					}
 				}
 			}
 			settingsControlRow {
 				Toggle("Direction", isOn: announcementDirectionBinding)
-					.accessibilityFocused(focus, equals: .announcementDirection)
-					.onChange(of: includeAnnouncementDirection) { _, _ in
-						restoreFocus(.announcementDirection)
-					}
 			}
 			if includeAnnouncementDirection {
 				settingsControlRow {
-					Picker("Direction Style", selection: directionStyleBinding) {
-						ForEach(DirectionStyle.allCases) { item in
-							Text(item.label).tag(item)
+					VStack(alignment: .leading, spacing: 8) {
+						settingsSegmentedControlLabel("Direction Style")
+						Picker("Direction Style", selection: directionStyleBinding) {
+							ForEach(DirectionStyle.allCases) { item in
+								Text(directionStyleSegmentLabel(item))
+									.accessibilityLabel(directionStyleSegmentAccessibilityLabel(item))
+									.tag(item)
+							}
 						}
-					}
-					.pickerStyle(.menu)
-					.lineLimit(nil)
-					.fixedSize(horizontal: false, vertical: true)
-					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-					.accessibilityFocused(focus, equals: .direction)
-					.onChange(of: directionStyleRaw) { _, _ in
-						restoreFocus(.direction)
+						.pickerStyle(.segmented)
 					}
 				}
 			}
 			settingsControlRow {
 				Toggle("Neighborhood", isOn: announcementNeighborhoodBinding)
-					.accessibilityFocused(focus, equals: .announcementNeighborhood)
-					.onChange(of: includeAnnouncementNeighborhood) { _, _ in
-						restoreFocus(.announcementNeighborhood)
-					}
 			}
 			if includeAnnouncementNeighborhood {
 				settingsControlRow {
-					Picker("Neighborhood Context", selection: areaModeBinding) {
-						ForEach(AreaMode.selectableCases) { mode in
-							Text(mode.label).tag(mode)
+					VStack(alignment: .leading, spacing: 8) {
+						settingsSegmentedControlLabel("Neighborhood Context")
+						Picker("Neighborhood Context", selection: areaModeBinding) {
+							ForEach(AreaMode.selectableCases) { mode in
+								Text(areaModeSegmentLabel(mode))
+									.accessibilityLabel(areaModeSegmentAccessibilityLabel(mode))
+									.tag(mode)
+							}
 						}
-					}
-					.pickerStyle(.menu)
-					.lineLimit(nil)
-					.fixedSize(horizontal: false, vertical: true)
-					.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-					.accessibilityFocused(focus, equals: .neighborhood)
-					.onChange(of: areaModeRaw) { _, _ in
-						restoreFocus(.neighborhood)
+						.pickerStyle(.segmented)
 					}
 				}
 			}
 			settingsControlRow {
 				Toggle("Intersection Details", isOn: intersectionDetailsBinding)
-					.accessibilityFocused(focus, equals: .intersectionDetails)
-					.onChange(of: includeIntersectionDetails) { _, _ in
-						restoreFocus(.intersectionDetails)
-					}
 			}
 			settingsHelperText("Adds mapped details such as traffic signals and pedestrian islands when that information is available.")
 			settingsControlRow {
-				spokenIntersectionsControl(focus: focus, restoreFocus: restoreFocus)
+				spokenIntersectionsControl
 			}
 			settingsHelperText(spokenIntersectionCountDescription)
 			sampleAnnouncementSection
@@ -1517,79 +1411,48 @@ struct ContentView: View {
 		.background(Color.crossSettingsHelper)
 	}
 
-	private func settingsRegionalWordingSection(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
+	private var settingsRegionalWordingSection: some View {
 		Group {
 			settingsHeader("Regional Wording")
 			settingsControlRow {
 				Toggle("Manhattan Snob Mode", isOn: manhattanSnobModeBinding)
-					.accessibilityFocused(focus, equals: .manhattanSnobMode)
-					.onChange(of: manhattanSnobMode) { _, _ in
-						restoreFocus(.manhattanSnobMode)
-					}
 			}
 			settingsHelperText("Uses Uptown, Downtown, East Side, and West Side when cardinal directions are spoken.")
 		}
 	}
 
-	private func spokenIntersectionsControl(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
-		Picker("Spoken Intersections", selection: spokenIntersectionCountBinding) {
-			ForEach(SpokenIntersectionCount.allCases) { count in
-				Text(spokenIntersectionOptionAccessibilityLabel(count))
-					.tag(count)
+	private var spokenIntersectionsControl: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			settingsSegmentedControlLabel("Spoken Intersections")
+			Picker("Spoken Intersections", selection: spokenIntersectionCountBinding) {
+				ForEach(SpokenIntersectionCount.allCases) { count in
+					Text(count.label)
+						.accessibilityLabel(spokenIntersectionOptionAccessibilityLabel(count))
+						.tag(count)
+				}
 			}
-		}
-		.pickerStyle(.menu)
-		.lineLimit(nil)
-		.fixedSize(horizontal: false, vertical: true)
-		.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-		.accessibilityFocused(focus, equals: .spokenIntersections)
-		.onChange(of: spokenIntersectionCountRaw) { _, _ in
-			restoreFocus(.spokenIntersections)
+			.pickerStyle(.segmented)
 		}
 	}
 
-	private func settingsMapDetailSection(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
+	private var settingsMapDetailSection: some View {
 		Group {
 			settingsHeader("Map Data")
 			settingsControlRow {
 				Toggle("Include crossings", isOn: crossingsBinding)
-					.accessibilityFocused(focus, equals: .crossings)
-					.onChange(of: includeCrossings) { _, _ in
-						restoreFocus(.crossings)
-					}
 			}
 			settingsControlRow {
 				Toggle("Include walking paths", isOn: walkingPathsBinding)
-					.accessibilityFocused(focus, equals: .walkingPaths)
-					.onChange(of: includeWalkingPaths) { _, _ in
-						restoreFocus(.walkingPaths)
-					}
 			}
 			settingsHelperText("Includes named mapped paths in Upcoming and other intersection results. Unnamed paths cannot provide a named intersection. Keep this off to focus results on the street grid.")
 		}
 	}
 
-	private func settingsInteractionSection(
-		focus: SettingsAccessibilityFocusBinding,
-		restoreFocus: SettingsFocusRestorer
-	) -> some View {
+	private var settingsInteractionSection: some View {
 		Group {
 			settingsHeader("Interaction")
 			settingsControlRow {
 				Toggle("Haptic scan feedback", isOn: hapticsBinding)
-					.accessibilityFocused(focus, equals: .haptics)
-					.onChange(of: hapticsEnabled) { _, _ in
-						restoreFocus(.haptics)
-					}
 			}
 		}
 	}
@@ -1757,6 +1620,60 @@ struct ContentView: View {
 		.foregroundStyle(Color.crossText)
 		.lineLimit(nil)
 		.fixedSize(horizontal: false, vertical: true)
+	}
+
+	private func settingsSegmentedControlLabel(_ title: String) -> some View {
+		Text(title)
+			.font(.body.weight(.semibold))
+			.foregroundStyle(Color.crossText)
+			.lineLimit(nil)
+			.fixedSize(horizontal: false, vertical: true)
+			.frame(maxWidth: .infinity, alignment: .leading)
+			.accessibilityHidden(true)
+	}
+
+	private func directionStyleSegmentLabel(_ style: DirectionStyle) -> String {
+		switch style {
+		case .words:
+			"Relative"
+		case .cardinal:
+			"Cardinal"
+		case .clockFace:
+			"Clock"
+		}
+	}
+
+	private func directionStyleSegmentAccessibilityLabel(_ style: DirectionStyle) -> String {
+		switch style {
+		case .words:
+			"Relative direction"
+		case .cardinal:
+			"Cardinal direction"
+		case .clockFace:
+			"Clock face direction"
+		}
+	}
+
+	private func areaModeSegmentLabel(_ mode: AreaMode) -> String {
+		switch mode {
+		case .off:
+			"Off"
+		case .near:
+			"Nearby"
+		case .toward:
+			"Toward"
+		}
+	}
+
+	private func areaModeSegmentAccessibilityLabel(_ mode: AreaMode) -> String {
+		switch mode {
+		case .off:
+			"Off"
+		case .near:
+			"Nearby only"
+		case .toward:
+			"Toward, includes nearby and toward areas"
+		}
 	}
 
 	private func settingsHeader(_ title: String) -> some View {
