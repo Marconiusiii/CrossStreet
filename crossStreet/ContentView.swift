@@ -1307,6 +1307,8 @@ struct ContentView: View {
 					}
 					.pickerStyle(.segmented)
 				}
+				.accessibilityElement(children: .contain)
+				.accessibilityLabel("Current Info Layout")
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
 			settingsControlRow {
@@ -1333,6 +1335,8 @@ struct ContentView: View {
 						}
 						.pickerStyle(.segmented)
 					}
+					.accessibilityElement(children: .contain)
+					.accessibilityLabel("Measurement Unit")
 				}
 			}
 			settingsControlRow {
@@ -1351,6 +1355,8 @@ struct ContentView: View {
 						}
 						.pickerStyle(.segmented)
 					}
+					.accessibilityElement(children: .contain)
+					.accessibilityLabel("Direction Style")
 				}
 			}
 			settingsControlRow {
@@ -1369,6 +1375,8 @@ struct ContentView: View {
 						}
 						.pickerStyle(.segmented)
 					}
+					.accessibilityElement(children: .contain)
+					.accessibilityLabel("Neighborhood Context")
 				}
 			}
 			settingsControlRow {
@@ -1433,6 +1441,8 @@ struct ContentView: View {
 			}
 			.pickerStyle(.segmented)
 		}
+		.accessibilityElement(children: .contain)
+		.accessibilityLabel("Spoken Intersections")
 	}
 
 	private var settingsMapDetailSection: some View {
