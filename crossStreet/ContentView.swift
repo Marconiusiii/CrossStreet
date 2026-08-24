@@ -28,6 +28,111 @@ private enum DisplayLayout: String, CaseIterable, Identifiable {
 	}
 }
 
+private struct AcknowledgementsSettingsButton: View {
+	@State private var isShowingAcknowledgements = false
+	@AccessibilityFocusState private var isButtonFocused: Bool
+
+	var body: some View {
+		Button {
+			isShowingAcknowledgements = true
+		} label: {
+			Text("Acknowledgements")
+				.font(.body)
+				.fontWeight(.semibold)
+				.foregroundStyle(Color.crossAccent)
+				.lineLimit(nil)
+				.fixedSize(horizontal: false, vertical: true)
+				.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+		}
+		.buttonStyle(.plain)
+		.accessibilityFocused($isButtonFocused)
+		.sheet(
+			isPresented: $isShowingAcknowledgements,
+			onDismiss: restoreButtonFocus
+		) {
+			AcknowledgementsView()
+		}
+	}
+
+	private func restoreButtonFocus() {
+		isButtonFocused = false
+
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+			isButtonFocused = true
+		}
+
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+			isButtonFocused = true
+		}
+	}
+}
+
+private struct AcknowledgementsView: View {
+	@Environment(\.dismiss) private var dismiss
+	@AccessibilityFocusState private var isHeadingFocused: Bool
+
+	var body: some View {
+		NavigationStack {
+			ScrollView {
+				VStack(alignment: .leading, spacing: 20) {
+					Text("Acknowledgements")
+						.font(.largeTitle)
+						.fontWeight(.bold)
+						.foregroundStyle(Color.crossText)
+						.lineLimit(nil)
+						.fixedSize(horizontal: false, vertical: true)
+						.accessibilityAddTraits(.isHeader)
+						.accessibilityFocused($isHeadingFocused)
+
+					Text("Special thanks to Jen Walz for inspiring the creation of this app!")
+						.font(.body)
+						.foregroundStyle(Color.crossText)
+						.lineLimit(nil)
+						.fixedSize(horizontal: false, vertical: true)
+
+					Text("Map data from OpenStreetMap, available under the Open Database License.")
+						.font(.body)
+						.foregroundStyle(Color.crossText)
+						.lineLimit(nil)
+						.fixedSize(horizontal: false, vertical: true)
+
+					Link(
+						"OpenStreetMap copyright and licence",
+						destination: URL(string: "https://www.openstreetmap.org/copyright")!
+					)
+					.font(.body)
+					.foregroundStyle(Color.crossAccent)
+					.underline()
+					.lineLimit(nil)
+					.fixedSize(horizontal: false, vertical: true)
+					.accessibilityTouchRegion(minHeight: 60, verticalPadding: 4, alignment: .leading)
+					.accessibilityAddTraits(.isLink)
+					.accessibilityRemoveTraits(.isButton)
+					.accessibilityHint("Opens in external browser")
+				}
+				.padding(24)
+				.frame(maxWidth: .infinity, alignment: .leading)
+			}
+			.scrollContentBackground(.hidden)
+			.background(Color.crossBg)
+			.navigationBarTitleDisplayMode(.inline)
+			.toolbar {
+				ToolbarItem(placement: .confirmationAction) {
+					Button("Done") {
+						dismiss()
+					}
+				}
+			}
+		}
+		.tint(Color.crossAccent)
+		.onAppear {
+			DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+				isHeadingFocused = true
+			}
+		}
+	}
+}
+
 private struct PersistentScanButtonStyle: ButtonStyle {
 	@Environment(\.isEnabled) private var isEnabled
 
@@ -1299,6 +1404,8 @@ struct ContentView: View {
 			settingsHeader("Display")
 			settingsControlRow {
 				VStack(alignment: .leading, spacing: 8) {
+					Text("Current Info Layout")
+						.foregroundStyle(Color.crossText)
 					Picker("Current Info Layout", selection: displayLayoutBinding) {
 						ForEach(DisplayLayout.allCases) { layout in
 							Text(layout.label).tag(layout)
@@ -1306,8 +1413,6 @@ struct ContentView: View {
 					}
 					.pickerStyle(.segmented)
 				}
-				.accessibilityElement(children: .contain)
-				.accessibilityLabel("Current Info Layout")
 			}
 			settingsHelperText("Default keeps Current Info and the current announcement side by side. Centered puts each in its own centered row.")
 			settingsControlRow {
@@ -1421,7 +1526,8 @@ struct ContentView: View {
 
 	private var spokenIntersectionsControl: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			settingsSegmentedControlLabel("Spoken Intersections")
+			Text("Spoken Intersections")
+				.foregroundStyle(Color.crossText)
 			Picker("Spoken Intersections", selection: spokenIntersectionCountBinding) {
 				ForEach(SpokenIntersectionCount.allCases) { count in
 					Text(count.label)
@@ -1431,8 +1537,6 @@ struct ContentView: View {
 			}
 			.pickerStyle(.segmented)
 		}
-		.accessibilityElement(children: .contain)
-		.accessibilityLabel("Spoken Intersections")
 	}
 
 	private var settingsMapDetailSection: some View {
@@ -1477,23 +1581,8 @@ struct ContentView: View {
 				externalLink(title: "Privacy Policy", url: "https://marconius.com/csPrivacy/")
 			}
 			settingsControlRow {
-				DisclosureGroup("Acknowledgements") {
-					VStack(alignment: .leading, spacing: 8) {
-						Text("Special thanks to Jen Walz for inspiring the creation of this app!")
-							.lineLimit(nil)
-							.fixedSize(horizontal: false, vertical: true)
-						Text("Map data from OpenStreetMap, available under the Open Database License.")
-							.lineLimit(nil)
-							.fixedSize(horizontal: false, vertical: true)
-						Link(
-							"OpenStreetMap copyright and licence",
-							destination: URL(string: "https://www.openstreetmap.org/copyright")!
-						)
-					}
-					.font(.footnote)
-				}
+				AcknowledgementsSettingsButton()
 			}
-			.accessibilityElement(children: .contain)
 			settingsControlRow {
 				Text(appFooterText)
 					.font(.footnote)
@@ -1621,16 +1710,6 @@ struct ContentView: View {
 		.foregroundStyle(Color.crossText)
 		.lineLimit(nil)
 		.fixedSize(horizontal: false, vertical: true)
-	}
-
-	private func settingsSegmentedControlLabel(_ title: String) -> some View {
-		Text(title)
-			.font(.body.weight(.semibold))
-			.foregroundStyle(Color.crossText)
-			.lineLimit(nil)
-			.fixedSize(horizontal: false, vertical: true)
-			.frame(maxWidth: .infinity, alignment: .leading)
-			.accessibilityHidden(true)
 	}
 
 	private func directionStyleSegmentLabel(_ style: DirectionStyle) -> String {
