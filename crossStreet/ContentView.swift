@@ -1299,7 +1299,6 @@ struct ContentView: View {
 			settingsHeader("Display")
 			settingsControlRow {
 				VStack(alignment: .leading, spacing: 8) {
-					settingsSegmentedControlLabel("Current Info Layout")
 					Picker("Current Info Layout", selection: displayLayoutBinding) {
 						ForEach(DisplayLayout.allCases) { layout in
 							Text(layout.label).tag(layout)
@@ -1327,7 +1326,6 @@ struct ContentView: View {
 			if includeAnnouncementDistance {
 				settingsControlRow {
 					VStack(alignment: .leading, spacing: 8) {
-						settingsSegmentedControlLabel("Measurement Unit")
 						Picker("Measurement Unit", selection: measurementUnitBinding) {
 							ForEach(MeasurementUnit.allCases) { item in
 								Text(item.label).tag(item)
@@ -1345,7 +1343,6 @@ struct ContentView: View {
 			if includeAnnouncementDirection {
 				settingsControlRow {
 					VStack(alignment: .leading, spacing: 8) {
-						settingsSegmentedControlLabel("Direction Style")
 						Picker("Direction Style", selection: directionStyleBinding) {
 							ForEach(DirectionStyle.allCases) { item in
 								Text(directionStyleSegmentLabel(item))
@@ -1365,7 +1362,6 @@ struct ContentView: View {
 			if includeAnnouncementNeighborhood {
 				settingsControlRow {
 					VStack(alignment: .leading, spacing: 8) {
-						settingsSegmentedControlLabel("Neighborhood Context")
 						Picker("Neighborhood Context", selection: areaModeBinding) {
 							ForEach(AreaMode.selectableCases) { mode in
 								Text(areaModeSegmentLabel(mode))
