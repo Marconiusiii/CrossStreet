@@ -1333,8 +1333,6 @@ struct ContentView: View {
 						}
 						.pickerStyle(.segmented)
 					}
-					.accessibilityElement(children: .contain)
-					.accessibilityLabel("Measurement Unit")
 				}
 			}
 			settingsControlRow {
@@ -1352,8 +1350,6 @@ struct ContentView: View {
 						}
 						.pickerStyle(.segmented)
 					}
-					.accessibilityElement(children: .contain)
-					.accessibilityLabel("Direction Style")
 				}
 			}
 			settingsControlRow {
@@ -1371,8 +1367,6 @@ struct ContentView: View {
 						}
 						.pickerStyle(.segmented)
 					}
-					.accessibilityElement(children: .contain)
-					.accessibilityLabel("Neighborhood Context")
 				}
 			}
 			settingsControlRow {
