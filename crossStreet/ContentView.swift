@@ -1493,6 +1493,7 @@ struct ContentView: View {
 					.font(.footnote)
 				}
 			}
+			.accessibilityElement(children: .contain)
 			settingsControlRow {
 				Text(appFooterText)
 					.font(.footnote)
